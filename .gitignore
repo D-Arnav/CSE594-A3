@@ -4,3 +4,5 @@ data/train/
 __pycache__/
 *.pyc
 .pytest_cache/
+study_app/responses.db
+outputs/lora/

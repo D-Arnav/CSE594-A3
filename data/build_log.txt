@@ -1,0 +1,47 @@
+build 2026-10-01T11:40:12 seed=42 pool=60
+POOL United States: 60 of 23875, 0 closer than 25 km to another
+POOL Canada: 60 of 9580, 0 closer than 25 km to another
+POOL Mexico: 60 of 4759, 0 closer than 25 km to another
+POOL Brazil: 60 of 10425, 0 closer than 25 km to another
+POOL Argentina: 60 of 4260, 0 closer than 25 km to another
+POOL Chile: 60 of 2447, 0 closer than 25 km to another
+POOL United Kingdom: 60 of 1491, 0 closer than 25 km to another
+POOL Ireland: 60 of 623, 0 closer than 25 km to another
+POOL France: 60 of 2047, 0 closer than 25 km to another
+POOL Spain: 60 of 2470, 0 closer than 25 km to another
+POOL Italy: 60 of 1508, 0 closer than 25 km to another
+POOL Germany: 60 of 1204, 0 closer than 25 km to another
+POOL Russia: 60 of 14984, 0 closer than 25 km to another
+POOL Poland: 60 of 1134, 0 closer than 25 km to another
+POOL Japan: 60 of 2128, 0 closer than 25 km to another
+POOL South Korea: 60 of 616, 52 closer than 25 km to another
+POOL India: 60 of 6525, 0 closer than 25 km to another
+POOL Thailand: 60 of 2682, 0 closer than 25 km to another
+POOL South Africa: 60 of 2969, 0 closer than 25 km to another
+POOL Australia: 60 of 11052, 0 closer than 25 km to another
+FILTER unreadable=0 small=1 near-dup=0 kept=1199
+OCR 1199 images in 0.0 s (cached ones are free)
+FILTER gps-overlay=1 kept=1198
+TEXT United States: 1 OCR-text / 59 no-text candidates
+TEXT Canada: 0 OCR-text / 60 no-text candidates
+TEXT Mexico: 1 OCR-text / 59 no-text candidates
+TEXT Brazil: 2 OCR-text / 58 no-text candidates
+TEXT Argentina: 1 OCR-text / 59 no-text candidates
+TEXT Chile: 0 OCR-text / 60 no-text candidates
+TEXT United Kingdom: 0 OCR-text / 60 no-text candidates
+TEXT Ireland: 2 OCR-text / 58 no-text candidates
+TEXT France: 0 OCR-text / 60 no-text candidates
+TEXT Spain: 0 OCR-text / 60 no-text candidates
+TEXT Italy: 0 OCR-text / 60 no-text candidates
+TEXT Germany: 1 OCR-text / 59 no-text candidates
+TEXT Russia: 8 OCR-text / 50 no-text candidates
+TEXT Poland: 4 OCR-text / 56 no-text candidates
+TEXT Japan: 1 OCR-text / 59 no-text candidates
+TEXT South Korea: 8 OCR-text / 52 no-text candidates
+TEXT India: 1 OCR-text / 59 no-text candidates
+TEXT Thailand: 2 OCR-text / 58 no-text candidates
+TEXT South Africa: 0 OCR-text / 60 no-text candidates
+TEXT Australia: 3 OCR-text / 57 no-text candidates
+reserve pool: 798 -> data/raw/reserve_pool.csv
+WROTE study: 200 images, has_text=9
+WROTE dev: 200 images, has_text=5

@@ -1,0 +1,201 @@
+trial_id,image_path,source_id,country,cluster,lat,lon,has_text,ocr_text,script,split
+S001,data/study/S001.jpg,1443946542615315,South Africa,Southern Hemisphere,-23.813970362375,31.582926744808,False,,,study
+S002,data/study/S002.jpg,1228294390928150,France,Western Europe,46.185313400067,-0.97934071583511,False,,,study
+S003,data/study/S003.jpg,452524426432322,Russia,Eastern Europe,64.45798096460341,43.18100156193756,True,О26МРН,Cyrillic,study
+S004,data/study/S004.jpg,272810484548494,Italy,Western Europe,39.325538609208,9.1475428246282,False,,,study
+S005,data/study/S005.jpg,206861107664175,France,Western Europe,46.827572680798,6.0914044686757,False,,,study
+S006,data/study/S006.jpg,497273091627395,United States,North America,35.66678150641,-97.163698978647,False,,,study
+S007,data/study/S007.jpg,157878389681865,United States,North America,44.482537434874,-69.706225163304,False,,,study
+S008,data/study/S008.jpg,529004711798865,Argentina,South America,-34.682220665955,-58.822893540011,False,,,study
+S009,data/study/S009.jpg,984971758977641,Mexico,North America,18.909840034661,-98.859718173337,False,,,study
+S010,data/study/S010.jpg,486773295974362,United Kingdom,British Isles,53.505996822913,-2.3478629536445,False,,,study
+S011,data/study/S011.jpg,172769931411789,Italy,Western Europe,40.832783558485,17.167954612468,False,,,study
+S012,data/study/S012.jpg,2900682333479385,Russia,Eastern Europe,50.570553746462,60.906464069187,False,,,study
+S013,data/study/S013.jpg,157167736352242,Australia,Southern Hemisphere,-20.853222223722,144.6865555493,False,,,study
+S014,data/study/S014.jpg,193375392611252,Italy,Western Europe,42.552622457768,11.811473907694,False,,,study
+S015,data/study/S015.jpg,321629312828986,Australia,Southern Hemisphere,-31.941,133.27616671196,False,,,study
+S016,data/study/S016.jpg,1121016381697536,Russia,Eastern Europe,52.583289424961,56.815796732156,False,,,study
+S017,data/study/S017.jpg,462057461729535,Australia,Southern Hemisphere,-32.329555557595,147.55808333129,False,,,study
+S018,data/study/S018.jpg,3949162541858430,Australia,Southern Hemisphere,-15.29752181772,145.0765850306,False,,,study
+S019,data/study/S019.jpg,525935155244363,Germany,Western Europe,50.118842888697,8.8535035664934,False,,,study
+S020,data/study/S020.jpg,180884723922646,France,Western Europe,45.373897469701,-1.0796381570073,False,,,study
+S021,data/study/S021.jpg,2891251504468357,United States,North America,46.747406569032,-67.693169296548,False,,,study
+S022,data/study/S022.jpg,525233235524298,Thailand,South / Southeast Asia,18.296275670766,99.537648540563,False,,,study
+S023,data/study/S023.jpg,459189821816853,Canada,North America,48.456190783889,-85.112678618612,False,,,study
+S024,data/study/S024.jpg,508249830538906,Spain,Western Europe,36.748240298222,-3.8014219688269,False,,,study
+S025,data/study/S025.jpg,137044518411372,Australia,Southern Hemisphere,-20.475083336465,146.23186111111,False,,,study
+S026,data/study/S026.jpg,2936848786530122,France,Western Europe,43.565407065573,6.1838088337899,False,,,study
+S027,data/study/S027.jpg,1173479133084165,India,South / Southeast Asia,28.592428373193,77.081345826161,False,,,study
+S028,data/study/S028.jpg,836560966947668,Canada,North America,49.058797570338,-81.066368685004,False,,,study
+S029,data/study/S029.jpg,478161873294991,Poland,Eastern Europe,51.138468380394,20.857708337119,False,,,study
+S030,data/study/S030.jpg,188578413695222,Mexico,North America,18.0982792,-94.62132540000222,False,,,study
+S031,data/study/S031.jpg,182131563780770,France,Western Europe,47.209172954364,0.078075002125506,False,,,study
+S032,data/study/S032.jpg,515567796281507,Japan,East Asia,39.946495899475,140.93630303217,False,,,study
+S033,data/study/S033.jpg,378574176807887,South Africa,Southern Hemisphere,-31.64493344762,28.786936306612,False,,,study
+S034,data/study/S034.jpg,1204724819946155,Chile,South America,-38.782141179233,-73.400311406881,False,,,study
+S035,data/study/S035.jpg,876296316253633,Italy,Western Europe,38.007935400772,13.618602402148,False,,,study
+S036,data/study/S036.jpg,203557591355841,Ireland,British Isles,51.912126462689,-8.0520402973183,True,CAREWSWOOD,Latin,study
+S037,data/study/S037.jpg,775148893374536,United States,North America,43.92694571431,-69.543543761311,False,,,study
+S038,data/study/S038.jpg,172850344731113,Ireland,British Isles,55.087305998134,-7.2442550031509,False,,,study
+S039,data/study/S039.jpg,153772046647593,South Korea,East Asia,33.431338182759,126.92567380211,False,,,study
+S040,data/study/S040.jpg,935954417227308,Spain,Western Europe,37.084424237888,-4.3754830044615,False,,,study
+S041,data/study/S041.jpg,411714940949944,Canada,North America,54.34674417924739,-126.8199351064642,False,,,study
+S042,data/study/S042.jpg,932695824177511,Thailand,South / Southeast Asia,13.537505039767,99.556509573429,False,,,study
+S043,data/study/S043.jpg,1601665753377463,Spain,Western Europe,39.394305994656,-0.32863331308611,False,,,study
+S044,data/study/S044.jpg,214912826776171,Spain,Western Europe,39.218330801114,-3.786824300565,False,,,study
+S045,data/study/S045.jpg,954873091845683,Brazil,South America,-16.079196800000002,-44.644410000000015,False,,,study
+S046,data/study/S046.jpg,290728435938641,Japan,East Asia,36.243821393047,138.99932364877,False,,,study
+S047,data/study/S047.jpg,293618488917485,United Kingdom,British Isles,53.618934232561,-0.42772904051798,False,,,study
+S048,data/study/S048.jpg,754919078538639,Spain,Western Europe,39.467666155967,2.8992230577314,False,,,study
+S049,data/study/S049.jpg,749706385744851,Chile,South America,-37.175547216382,-72.391907022796,False,,,study
+S050,data/study/S050.jpg,3062926053990979,United States,North America,41.177491256606,-97.564236985309,False,,,study
+S051,data/study/S051.jpg,367081414674256,Thailand,South / Southeast Asia,14.17370355824,98.93726551852,False,,,study
+S052,data/study/S052.jpg,905207266693482,Australia,Southern Hemisphere,-32.060249971712,116.97627779855,False,,,study
+S053,data/study/S053.jpg,321806162941660,Thailand,South / Southeast Asia,19.690567772953,99.709131465815,False,,,study
+S054,data/study/S054.jpg,3980362848716294,Germany,Western Europe,54.5030881492,9.0433228987337,False,,,study
+S055,data/study/S055.jpg,178963274111263,South Africa,Southern Hemisphere,-23.2366016126,29.904950515107,False,,,study
+S056,data/study/S056.jpg,245542080366540,Argentina,South America,-22.671825183384,-65.705244923762,False,,,study
+S057,data/study/S057.jpg,948980169201964,India,South / Southeast Asia,20.562186988752,78.862168562439,False,,,study
+S058,data/study/S058.jpg,747647693059161,Spain,Western Europe,28.053231858746,-14.359173725794,False,,,study
+S059,data/study/S059.jpg,1858462874302595,Spain,Western Europe,38.757969919173,-2.8978758116249,False,,,study
+S060,data/study/S060.jpg,4031246890287365,Japan,East Asia,42.063787098843,143.06499488321,True,noo,Latin,study
+S061,data/study/S061.jpg,211711470546018,Brazil,South America,-6.7490644519393,-38.814614601583,False,,,study
+S062,data/study/S062.jpg,218876209706935,Thailand,South / Southeast Asia,15.902790840969,99.448421139974,False,,,study
+S063,data/study/S063.jpg,153545160062547,United Kingdom,British Isles,54.305516383589,-7.8828027326252,False,,,study
+S064,data/study/S064.jpg,253618416808806,United Kingdom,British Isles,55.18334610000226,-2.81282429999783,False,,,study
+S065,data/study/S065.jpg,1439669349746327,Canada,North America,51.210225725513,-103.27086080935,False,,,study
+S066,data/study/S066.jpg,151511360259120,Spain,Western Europe,40.034153000503,-3.9250029726606,False,,,study
+S067,data/study/S067.jpg,899354547583613,France,Western Europe,42.689166830182,9.3786876946468,False,,,study
+S068,data/study/S068.jpg,895011994613260,South Korea,East Asia,36.200205553685,127.87020833545,False,,,study
+S069,data/study/S069.jpg,302131861533003,Japan,East Asia,32.016320792811,131.01160039978,False,,,study
+S070,data/study/S070.jpg,177499384136822,South Africa,Southern Hemisphere,-25.792936993059,26.785555875797,False,,,study
+S071,data/study/S071.jpg,574174533973113,Argentina,South America,-29.9781814322,-57.693820906444,False,,,study
+S072,data/study/S072.jpg,1164003717405560,Thailand,South / Southeast Asia,11.278862566625,99.533716634838,False,,,study
+S073,data/study/S073.jpg,1130276214117512,South Korea,East Asia,37.415121950931,126.56402554586,False,,,study
+S074,data/study/S074.jpg,305165571086984,Australia,Southern Hemisphere,-35.476833333256,144.32827777249,False,,,study
+S075,data/study/S075.jpg,6074761305871168,Italy,Western Europe,45.523778064468,11.021880818561,False,,,study
+S076,data/study/S076.jpg,165881615448324,Ireland,British Isles,54.418174983042,-8.3157361799073,False,,,study
+S077,data/study/S077.jpg,320858056107166,France,Western Europe,48.818063513638,5.0222913022007,False,,,study
+S078,data/study/S078.jpg,1107566783084529,India,South / Southeast Asia,21.643188330122,75.077040256802,False,,,study
+S079,data/study/S079.jpg,391829545150199,South Korea,East Asia,35.468099146542,128.40110997093,False,,,study
+S080,data/study/S080.jpg,1072953403230432,Germany,Western Europe,50.833788785083,10.429341029133,False,,,study
+S081,data/study/S081.jpg,193218902652178,Brazil,South America,-9.6957521554356,-35.792884562939,False,,,study
+S082,data/study/S082.jpg,2845321019050886,South Africa,Southern Hemisphere,-29.074151109231,16.831248164346,False,,,study
+S083,data/study/S083.jpg,651628439006819,Poland,Eastern Europe,50.260003330271,21.853498328527,False,,,study
+S084,data/study/S084.jpg,214853910173833,South Africa,Southern Hemisphere,-27.075356149913,26.098083628575,False,,,study
+S085,data/study/S085.jpg,3895200380534078,Argentina,South America,-32.75929140625,-68.720279210813,False,,,study
+S086,data/study/S086.jpg,455825112152565,Chile,South America,-36.820946054063,-72.89088703887,False,,,study
+S087,data/study/S087.jpg,171748141432615,Ireland,British Isles,51.70701580361,-9.5964184723486,False,,,study
+S088,data/study/S088.jpg,305992177819323,Italy,Western Europe,45.759901963925,12.310183810688,False,,,study
+S089,data/study/S089.jpg,2530193257275453,United States,North America,40.234646496735,-96.180037911103,False,,,study
+S090,data/study/S090.jpg,2957871111164449,Thailand,South / Southeast Asia,15.427589127628,99.617710047202,False,,,study
+S091,data/study/S091.jpg,499319517923527,Ireland,British Isles,52.175715999941,-9.7468569999883,False,,,study
+S092,data/study/S092.jpg,871565910065163,Japan,East Asia,33.995594312619,130.95820054811,False,,,study
+S093,data/study/S093.jpg,3947093912053230,Chile,South America,-26.390501980098,-70.669613442388,False,,,study
+S094,data/study/S094.jpg,289855186017879,South Korea,East Asia,37.5466011165,127.00315236703,False,,,study
+S095,data/study/S095.jpg,536146184423676,South Korea,East Asia,33.231359827788,126.29674792667,False,,,study
+S096,data/study/S096.jpg,109402441198774,Poland,Eastern Europe,51.212133143057,23.111020219522,False,,,study
+S097,data/study/S097.jpg,460960695187346,Brazil,South America,-6.6660050111484,-35.114319998149,False,,,study
+S098,data/study/S098.jpg,1146081285835471,Ireland,British Isles,53.936511114298,-9.3950777186211,False,,,study
+S099,data/study/S099.jpg,1214295825656052,South Korea,East Asia,36.451687539639,127.16802936331,False,,,study
+S100,data/study/S100.jpg,136393851801798,Germany,Western Europe,50.128364658559,11.095163427567,False,,,study
+S101,data/study/S101.jpg,504741394045457,Japan,East Asia,37.189699298736,138.30529740243,False,,,study
+S102,data/study/S102.jpg,1875594095930015,Argentina,South America,-34.00269200193,-62.230869556897,False,,,study
+S103,data/study/S103.jpg,765645577430330,Spain,Western Europe,38.995780283431,-4.2441706138112,False,,,study
+S104,data/study/S104.jpg,500658147782724,South Korea,East Asia,36.226924566626,127.09831916191,False,,,study
+S105,data/study/S105.jpg,2767636076878725,Italy,Western Europe,40.893369868762,14.610597589416,False,,,study
+S106,data/study/S106.jpg,285034399970582,Japan,East Asia,32.249363827895,130.76117248976,False,,,study
+S107,data/study/S107.jpg,196313802326705,Canada,North America,62.503572219011,-114.28665000474,False,,,study
+S108,data/study/S108.jpg,1702307076618560,Japan,East Asia,43.398717943599,143.69729594516,False,,,study
+S109,data/study/S109.jpg,325243502278279,Mexico,North America,17.064024730113,-96.748736292395,False,,,study
+S110,data/study/S110.jpg,3637846946325007,United States,North America,42.71142308513,-121.84713225354,False,,,study
+S111,data/study/S111.jpg,580593662832087,Germany,Western Europe,51.998639533253,9.8566112804258,False,,,study
+S112,data/study/S112.jpg,1005232876929375,Russia,Eastern Europe,58.90324912603945,30.95992800146341,False,,,study
+S113,data/study/S113.jpg,263979832175228,United States,North America,63.549333964609,-148.81093832505,False,,,study
+S114,data/study/S114.jpg,401508961713168,Russia,Eastern Europe,64.203642,42.375235,True,ОЗ6МРН,Cyrillic,study
+S115,data/study/S115.jpg,929850074456832,United States,North America,32.331884343283,-107.65942824185,False,,,study
+S116,data/study/S116.jpg,505466244100517,Brazil,South America,-22.507834681904,-50.88294842651,True,Rodovia | 270] | Raposo | Tavares,Latin,study
+S117,data/study/S117.jpg,4075688162453927,Chile,South America,-36.591219950842,-72.955600533887,False,,,study
+S118,data/study/S118.jpg,467662087679102,South Korea,East Asia,35.39242973648,128.84014564098,False,,,study
+S119,data/study/S119.jpg,910710993045038,Italy,Western Europe,37.575362988704,15.049165800322,False,,,study
+S120,data/study/S120.jpg,149111967170730,Ireland,British Isles,54.762071818063,-8.5277290903131,False,,,study
+S121,data/study/S121.jpg,474122037151619,Chile,South America,-24.967176062459,-70.383318845678,False,,,study
+S122,data/study/S122.jpg,157644049631006,Mexico,North America,24.298924869165,-110.31743850053,False,,,study
+S123,data/study/S123.jpg,293578805578439,United Kingdom,British Isles,56.709686995215,-2.7332170298215,False,,,study
+S124,data/study/S124.jpg,294742012295552,Thailand,South / Southeast Asia,15.020766328855,103.64433851454,False,,,study
+S125,data/study/S125.jpg,1180587622379419,Thailand,South / Southeast Asia,10.924179481829,99.301720795331,False,,,study
+S126,data/study/S126.jpg,142786811199052,Thailand,South / Southeast Asia,7.6805413457702,100.38040708536,False,,,study
+S127,data/study/S127.jpg,747507659819923,Brazil,South America,-22.07018690686672,-49.368362568095634,False,,,study
+S128,data/study/S128.jpg,697885534588592,Spain,Western Europe,36.557189939511,-4.6563219097781,False,,,study
+S129,data/study/S129.jpg,4337935119551281,Argentina,South America,-37.350681286622,-64.470167439886,False,,,study
+S130,data/study/S130.jpg,856439848239985,Canada,North America,50.447084813514,-100.6252068435,False,,,study
+S131,data/study/S131.jpg,3676889602417324,Germany,Western Europe,53.331895705325,10.013984440726,False,,,study
+S132,data/study/S132.jpg,156844583056282,Mexico,North America,17.648157664521,-101.54267304057,True,Sorion,Latin,study
+S133,data/study/S133.jpg,225014079002240,Russia,Eastern Europe,46.419601041644,43.886120142079,False,,,study
+S134,data/study/S134.jpg,1799044260263757,United States,North America,43.626156708231,-85.264781566917,False,,,study
+S135,data/study/S135.jpg,913487579323254,South Africa,Southern Hemisphere,-33.29151434492573,27.349785815909726,False,,,study
+S136,data/study/S136.jpg,2924868044467538,India,South / Southeast Asia,19.962276025799,79.883423234076,False,,,study
+S137,data/study/S137.jpg,477256676660606,Russia,Eastern Europe,62.095507094221,131.35865418457,False,,,study
+S138,data/study/S138.jpg,2853105314940819,India,South / Southeast Asia,29.899596034082,77.964452384306,False,,,study
+S139,data/study/S139.jpg,1036494627082808,France,Western Europe,49.51266138027339,-1.2908376346542472,False,,,study
+S140,data/study/S140.jpg,2603268753306348,Ireland,British Isles,54.257087998789,-8.7636449316807,True,EASKEY,Latin,study
+S141,data/study/S141.jpg,616948426365072,Brazil,South America,-22.698902558257,-42.581659436506,False,,,study
+S142,data/study/S142.jpg,1151195292051037,Russia,Eastern Europe,59.154208427813,56.180220669774,False,,,study
+S143,data/study/S143.jpg,872396906641719,United Kingdom,British Isles,53.825779669328,-0.627495237888,False,,,study
+S144,data/study/S144.jpg,1161688714309891,Poland,Eastern Europe,51.788595546878,23.387367886538,False,,,study
+S145,data/study/S145.jpg,148600357228432,Chile,South America,-23.060951689074,-67.890695295318,False,,,study
+S146,data/study/S146.jpg,260249745784429,Russia,Eastern Europe,58.110453201137,68.253101692875,True,ХАРАЧИНО | ДЕГТЯРЕВа,Cyrillic,study
+S147,data/study/S147.jpg,3293094690975661,Canada,North America,60.55712890000002,-134.50065839997222,False,,,study
+S148,data/study/S148.jpg,488602769004818,Brazil,South America,-2.8436468581623,-60.032547088356,False,,,study
+S149,data/study/S149.jpg,137260465095388,Australia,Southern Hemisphere,-35.005682871984,117.87208059125,False,,,study
+S150,data/study/S150.jpg,2575172822783720,Argentina,South America,-38.397352535612,-58.680577715131,False,,,study
+S151,data/study/S151.jpg,1367548590292857,Argentina,South America,-22.898463371453,-65.608666630236,False,,,study
+S152,data/study/S152.jpg,307297680930981,Japan,East Asia,43.634899577402,142.69927737451,False,,,study
+S153,data/study/S153.jpg,723186928711395,Mexico,North America,17.38161329999799,-93.79515659999734,False,,,study
+S154,data/study/S154.jpg,804935320399884,United Kingdom,British Isles,58.95001174508,-2.954444596499,False,,,study
+S155,data/study/S155.jpg,521919388810193,France,Western Europe,45.830071299822,5.6405253961317,False,,,study
+S156,data/study/S156.jpg,561799071451911,Germany,Western Europe,49.525403550566,10.866349221436,False,,,study
+S157,data/study/S157.jpg,900824450464579,Argentina,South America,-31.971938623697,-65.087767931949,False,,,study
+S158,data/study/S158.jpg,2783592458559345,India,South / Southeast Asia,24.862994875465,71.759573561378,False,,,study
+S159,data/study/S159.jpg,566988285451744,Japan,East Asia,33.16848524990366,131.63537438799483,False,,,study
+S160,data/study/S160.jpg,475426760207167,Russia,Eastern Europe,45.427514572007,47.044220042478,False,,,study
+S161,data/study/S161.jpg,337963734337611,Argentina,South America,-33.505838345556,-60.141578251389,False,,,study
+S162,data/study/S162.jpg,962141377820550,United Kingdom,British Isles,50.61933110000232,-4.501303500000001,False,,,study
+S163,data/study/S163.jpg,495469811879370,Italy,Western Europe,44.04758329013,12.41389994482,False,,,study
+S164,data/study/S164.jpg,843135682972204,South Africa,Southern Hemisphere,-33.084634819920986,18.031799554311,False,,,study
+S165,data/study/S165.jpg,196097576170735,Chile,South America,-27.9886739911716,-70.56289938009203,False,,,study
+S166,data/study/S166.jpg,806272810008501,Poland,Eastern Europe,53.495405283487,19.912588785977,False,,,study
+S167,data/study/S167.jpg,5512856612089677,Australia,Southern Hemisphere,-34.178111111702,146.16030555601,False,,,study
+S168,data/study/S168.jpg,374031093941376,Mexico,North America,27.51728565898,-109.95006753466,False,,,study
+S169,data/study/S169.jpg,1259117991194558,Brazil,South America,-13.604273316911,-39.494639185281,False,,,study
+S170,data/study/S170.jpg,543039136857105,Poland,Eastern Europe,53.442278627882,15.482306184358,False,,,study
+S171,data/study/S171.jpg,884131298985025,France,Western Europe,49.185515796326,-1.5216343054948,False,,,study
+S172,data/study/S172.jpg,366848591394951,Italy,Western Europe,40.916805766794,9.0953657667725,False,,,study
+S173,data/study/S173.jpg,292966102494363,South Africa,Southern Hemisphere,-34.168010378086,19.807022242427,False,,,study
+S174,data/study/S174.jpg,4153061811382317,Germany,Western Europe,54.99335959065,8.7067546977024,False,,,study
+S175,data/study/S175.jpg,3973547366094791,Brazil,South America,-17.081327417158,-39.481736812986,False,,,study
+S176,data/study/S176.jpg,3974403289342051,Mexico,North America,23.162594976503,-109.71571210186,False,,,study
+S177,data/study/S177.jpg,6312838598741621,United Kingdom,British Isles,57.176070118954,-2.214258939296,False,,,study
+S178,data/study/S178.jpg,1190239838148015,Poland,Eastern Europe,53.187498743602,23.261098304082,False,,,study
+S179,data/study/S179.jpg,919767345543913,South Africa,Southern Hemisphere,-33.944461793204,22.634931820982,False,,,study
+S180,data/study/S180.jpg,759097741276170,India,South / Southeast Asia,26.39624359429,71.234536007094,False,,,study
+S181,data/study/S181.jpg,781107079190558,Chile,South America,-40.26764086445,-72.959141310213,False,,,study
+S182,data/study/S182.jpg,300930568237863,Mexico,North America,17.990949472518,-93.132253132254,False,,,study
+S183,data/study/S183.jpg,2898066920499087,Chile,South America,-28.47797136196728,-70.73028448989231,False,,,study
+S184,data/study/S184.jpg,574119333957605,United Kingdom,British Isles,58.216315288763,-4.9992032147844,False,,,study
+S185,data/study/S185.jpg,453432719093901,Australia,Southern Hemisphere,-35.040750001794,139.8166111082,False,,,study
+S186,data/study/S186.jpg,450819872683744,Poland,Eastern Europe,54.169743706078,22.93106556548,False,,,study
+S187,data/study/S187.jpg,150749807408407,Canada,North America,58.6993925,-123.6684913888889,False,,,study
+S188,data/study/S188.jpg,324654895738832,Germany,Western Europe,52.804893908759,12.133277298001,False,,,study
+S189,data/study/S189.jpg,296973508759347,Ireland,British Isles,52.889960905057,-6.1571478697479,False,,,study
+S190,data/study/S190.jpg,770862760284112,Germany,Western Europe,52.453453399637,14.214219574855,False,,,study
+S191,data/study/S191.jpg,3922329897802601,India,South / Southeast Asia,17.311725368655,78.233394581953,False,,,study
+S192,data/study/S192.jpg,464276944666764,Mexico,North America,18.263703047011,-93.207536452546,False,,,study
+S193,data/study/S193.jpg,296783775273160,Poland,Eastern Europe,52.992421785851,17.393321740877,False,,,study
+S194,data/study/S194.jpg,210973453982101,Poland,Eastern Europe,51.43298172789,15.197252509281,True,2018/09/01 | 17.57:22,,study
+S195,data/study/S195.jpg,5042111089200145,Canada,North America,50.287070337304,-107.84072810147,False,,,study
+S196,data/study/S196.jpg,321567592637463,South Korea,East Asia,35.8341857935,128.52259574602,False,,,study
+S197,data/study/S197.jpg,538936880422816,Canada,North America,46.935982014511,-84.496799136585,False,,,study
+S198,data/study/S198.jpg,379200830076514,Ireland,British Isles,53.956664767243,-8.4632281551341,False,,,study
+S199,data/study/S199.jpg,469121100988603,India,South / Southeast Asia,8.3208192380185,77.58145557213,False,,,study
+S200,data/study/S200.jpg,1203963383387755,India,South / Southeast Asia,13.01002990086138,78.42758178064261,False,,,study
