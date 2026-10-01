@@ -1,11 +1,12 @@
 """GeoGuess-HAI study interface (SPEC 11). No GPU: reads the cached study_dataset.csv.
 
 Run from repo root:  streamlit run study_app/app.py
-URL params: ?pid=N fixes the participant id (else the next free id in the DB);
+URL params: ?pid=N fixes the participant id (else the next free id in the DB; on Streamlit Cloud
+            always pass ?pid=N, the DB is wiped on restart);
             ?live=1 asks server.py (env GEOHAI_SERVER_URL) for AI outputs, falling back to the cache.
 Env overrides: GEOHAI_STUDY_CSV, GEOHAI_PRACTICE_CSV, GEOHAI_DB.
 Optional Google Sheets logging: st.secrets [gsheets] sheet_url = "...", plus a
-[gsheets.service_account] table (needs `pip install gspread`); the sheet needs worksheets
+[gsheets.service_account] table; the sheet needs worksheets
 named "responses" and "surveys". SQLite is always written.
 
 rt_ms is measured server-side, from the first script run that renders the trial (after the

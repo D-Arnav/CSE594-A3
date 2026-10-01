@@ -1,6 +1,6 @@
 """Optional LoRA fine-tuning on the OSV-5M train split (SPEC 5.6).
 
-    python src/finetune_lora.py manifest --config config.yaml [--per-country 200] [--no-download]
+    python src/finetune_lora.py manifest --config config.yaml [--per-country N] [--no-download]
     python src/finetune_lora.py train --config config.yaml [--epochs 1] [--max-steps N] [--out outputs/lora]
 
 manifest: train.csv -> per-country spread-out sample, minus anything within 5 km of a study/dev
@@ -140,9 +140,10 @@ def download_train_images(manifest, repo, img_dir=IMG_DIR, workers=8):
     return len(todo)
 
 
-def make_manifest(cfg, per_country=200, train_csv=None, data_dir=DATA, out=MANIFEST, download=True):
+def make_manifest(cfg, per_country=None, train_csv=None, data_dir=DATA, out=MANIFEST, download=True):
     d, ft = cfg["data"], cfg.get("finetune", {})
     repo, seed = d.get("hf_repo", "osv5m/osv5m"), cfg["seed"]
+    per_country = per_country or ft.get("per_country", 200)
     names = countries(cfg)
     log = []
     meta = load_train_meta([ISO2[c] for c in names], train_csv, repo)
@@ -302,7 +303,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     m = sub.add_parser("manifest")
     m.add_argument("--config", default=str(ROOT / "config.yaml"))
-    m.add_argument("--per-country", type=int, default=200)
+    m.add_argument("--per-country", type=int, help="default: finetune.per_country")
     m.add_argument("--train-csv", help="local OSV-5M train.csv (default: data/raw/train.csv, downloaded)")
     m.add_argument("--no-download", action="store_true", help="write the manifest only")
     t = sub.add_parser("train")

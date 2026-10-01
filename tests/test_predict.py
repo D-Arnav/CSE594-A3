@@ -144,6 +144,7 @@ def test_main_end_to_end(tmp_path, monkeypatch):
     assert FakeGM.calls == 3
     T = json.loads(tfile.read_text())
     assert T["n"] == 3 and T["split"] == "dev" and T["nll_after"] <= T["nll_before"]
+    assert T["model_id"] == "m" and T["revision"] == "r"
     raw = predict.read_jsonl(tmp_path / "outputs" / "dev" / "raw_outputs.jsonl")
     assert [r["trial_id"] for r in raw] == ["D001", "D002", "D003"]
     assert all(r["temperature"] == T["T"] and r["temperature_source"] == "temperature.json" for r in raw)
@@ -151,3 +152,16 @@ def test_main_end_to_end(tmp_path, monkeypatch):
     assert list(df.columns) == COLUMNS and len(df) == 3
     assert df["ai_correct_top1"].tolist() == [True, True, False] and df["gt_rank"].tolist()[:2] == [1, 1]
     assert df["ai_rationale1"][0] == "Clue for Canada."
+
+
+def test_run_baseline_records_log_provenance(tmp_path, monkeypatch):
+    from types import SimpleNamespace as NS
+    monkeypatch.setattr(predict, "OUTPUTS", tmp_path)
+    (tmp_path / "dev").mkdir()
+    monkeypatch.setattr(predict, "load_image", lambda p: None)
+    gm = NS(model_id="m", revision="r", tokenizer=lambda s: {"input_ids": [0]},
+            generate=lambda img, prompt, n: '{"guesses": [{"country": "Japan", "confidence": 0.9}]}')
+    meta = pd.DataFrame([{"trial_id": "D001", "country": "Japan", "image_path": "x.jpg"}])
+    predict.run_baseline(gm, CFG, meta, LABELS, "dev")
+    (r,) = predict.read_jsonl(tmp_path / "dev" / "baseline_json.jsonl")
+    assert r["model_id"] == "m" and r["revision"] == "r"

@@ -181,6 +181,7 @@ def run_baseline(gm, cfg, meta, labels, split):
             raw = gm.generate(load_image(m["image_path"]), prompt, max_new)
             truncated = len(gm.tokenizer(raw)["input_ids"]) >= max_new  # hit the cap: likely cut-off JSON
             rec = baseline_record(m["trial_id"], m["country"], raw, labels, time.time() - t0, truncated)
+            rec.update(model_id=gm.model_id, revision=gm.revision)
             f.write(json.dumps(rec) + "\n")
             f.flush()
     ids = set(meta["trial_id"])
@@ -243,7 +244,9 @@ def main():
                                                    [truth[r["trial_id"]] for r in records])
         TEMPERATURE_FILE.parent.mkdir(parents=True, exist_ok=True)
         TEMPERATURE_FILE.write_text(json.dumps({"T": T, "nll_before": nll_before, "nll_after": nll_after,
-                                                "n": len(records), "split": "dev"}, indent=2))
+                                                "n": len(records), "split": "dev",
+                                                "model_id": cfg["model"]["model_id"],
+                                                "revision": cfg["model"]["revision"]}, indent=2))
         source = "temperature.json"
         print(f"fitted T={T:.4f}  NLL {nll_before:.4f} -> {nll_after:.4f}  (n={len(records)})")
     for r in records:

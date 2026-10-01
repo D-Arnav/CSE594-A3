@@ -61,10 +61,11 @@ def test_make_manifest_end_to_end(tmp_path, monkeypatch):
         pd.DataFrame({"lat": [35.0], "lon": [139.0]}).to_csv(tmp_path / split / f"{split}_meta.csv", index=False)
     index = pd.DataFrame({"id": meta["id"], "zip": "00.zip", "member": "00/" + meta["id"] + ".jpg"})
     monkeypatch.setattr(fl, "build_train_index", lambda repo: index[index["id"] != "FR0"])
-    cfg = {"seed": 42, "data": {"countries": ["Japan", "France"], "min_distance_km": 10}}
+    cfg = {"seed": 42, "data": {"countries": ["Japan", "France"], "min_distance_km": 10},
+           "finetune": {"per_country": 50}}
     monkeypatch.setattr(fl, "countries", lambda cfg: cfg["data"]["countries"])
     out = tmp_path / "train" / "train_manifest.csv"
-    fl.make_manifest(cfg, 50, tmp_path / "train.csv", tmp_path, out, download=False)
+    fl.make_manifest(cfg, None, tmp_path / "train.csv", tmp_path, out, download=False)
     m = pd.read_csv(out, dtype=str)
     assert list(m.columns) == fl.MANIFEST_COLS
     assert m["country"].value_counts().to_dict() == {"Japan": 50, "France": 39}  # FR0 not in any zip

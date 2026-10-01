@@ -52,8 +52,9 @@ class GeoModel:
         self.processor = AutoProcessor.from_pretrained(self.model_id, revision=self.revision)
         self.tokenizer = self.processor.tokenizer
         ip = getattr(self.processor, "image_processor", None)
-        if self.max_pixels and ip is not None and hasattr(ip, "max_pixels"):
-            # Qwen-family processors resize so that H*W <= size["longest_edge"]; others ignore max_pixels.
+        if self.max_pixels and type(ip).__name__.startswith("Qwen"):
+            # Qwen-family processors resize so that H*W <= size["longest_edge"]; for others (e.g.
+            # SmolVLM) longest_edge is an edge length, so they ignore max_pixels.
             ip.size = {"shortest_edge": min(ip.size["shortest_edge"], self.max_pixels),
                        "longest_edge": self.max_pixels}
         self.model = AutoModelForImageTextToText.from_pretrained(
@@ -156,10 +157,11 @@ def torch_equal(a, b):
 
 def clean_rationale(text):
     """Strip, collapse whitespace, keep at most two sentences; empty -> fallback.
-    No split after single-letter abbreviations ("U.S. roads"); a trailing fragment cut off by
+    Splits only before a capital or quote, so "U.S. roads" stays whole; a trailing fragment cut off by
     max_new_tokens is dropped when a complete sentence precedes it."""
     text = " ".join((text or "").split())
-    sentences = re.split(r"(?<=[.!?])(?<!\b[A-Z]\.)\s+", text)
+    # ponytail: "U.S. Virgin Islands" would split; fine for a two-sentence heuristic.
+    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z"])', text)
     if len(sentences) > 1 and not sentences[-1].endswith((".", "!", "?", '"')):
         sentences.pop()
     text = " ".join(sentences[:2]).strip()

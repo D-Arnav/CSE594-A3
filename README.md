@@ -106,7 +106,6 @@ disjoint study and dev sets (10 per country each), with trial IDs shuffled by th
 
 ```bash
 python src/build_dataset.py --config config.yaml --contact-sheet
-# smoke test: python src/build_dataset.py --config config.yaml --limit-countries 2 --pool-per-country 20
 ```
 
 Outputs: `data/{study,dev}/{S,D}NNN.jpg`, `data/{split}/{split}_meta.csv`, and `data/build_log.txt`, which
@@ -194,8 +193,9 @@ record in the `raw_outputs.jsonl` format. Take the "model running" screenshot (S
 streamlit run study_app/app.py
 ```
 
-- URL parameters: `?pid=N` fixes the participant ID. `?live=1` fetches the AI outputs from the server at
-  `$GEOHAI_SERVER_URL` and falls back to the cache.
+- URL parameters: `?pid=N` fixes the participant ID. On Streamlit Cloud the DB is wiped on restart, so give each
+  participant an explicit `?pid=N` link (0,1,2,...); auto-numbering is only safe locally. `?live=1` fetches the AI
+  outputs from the server at `$GEOHAI_SERVER_URL` and falls back to the cache.
 - Responses are logged to `study_app/responses.db` (SQLite). Override with `$GEOHAI_DB`.
 - Mirroring to Google Sheets is optional and is set up through `st.secrets` (see the docstring of `study_app/app.py`).
 

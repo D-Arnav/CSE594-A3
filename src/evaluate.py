@@ -122,7 +122,8 @@ def ece(conf, correct, n_bins):
 
 
 def tercile_table(df):
-    t = pd.qcut(df["ai_p1"].rank(method="first"), 3, labels=["low", "mid", "high"])
+    n = len(df)  # rank "max" keeps tied ai_p1 in one tercile
+    t = pd.cut(df["ai_p1"].rank(method="max"), [0, n / 3, 2 * n / 3, n], labels=["low", "mid", "high"])
     rows = []
     for name, g in df.groupby(t, observed=True):
         rows.append({"tercile": name, "n": len(g), "p1_min": float(g.ai_p1.min()),
@@ -347,7 +348,7 @@ def md_table(headers, rows):
 def summary_md(m, err_md):
     p = lambda x: "n/a" if x is None else f"{100 * x:.1f}%"  # noqa: E731
     ci = lambda k, f=p: f"{f(m[k]['value'])} [{f(m[k]['ci'][0])}, {f(m[k]['ci'][1])}]"  # noqa: E731
-    out = [f"# Evaluation report\n\nPredictions: `{m['pred']}` · n = {m['n']} · "
+    out = [f"# Evaluation report\n\nPredictions: `{m['pred']}` · model `{m['model_id']}` @ `{m['revision']}` · n = {m['n']} · "
            f"{m['bootstrap']} bootstrap resamples (seed {m['seed']})\n\n",
            "## Primary metrics (95% bootstrap CI)\n",
            md_table(["Metric", "Value"], [
@@ -416,7 +417,9 @@ def evaluate(pred, out, cfg, ann=None, ann2=None, raw=None, merge=True):
 
     n = len(df)
     m = {"pred": str(pred), "n": n, "seed": seed, "bootstrap": n_boot, "chance": 1 / len(labels),
-         "n_labels": len(labels), "ece_bins": n_bins}
+         "n_labels": len(labels), "ece_bins": n_bins,
+         "model_id": "|".join(df.model_id.astype(str).unique()),
+         "revision": "|".join(df.revision.astype(str).unique())}
     df["partial"] = same_cluster(df.ai_top1, df.country)
     for key, vals in [("top1", df.correct1), ("top3", df.correct3), ("mrr", 1 / df.gt_rank),
                       ("partial_credit", df.partial)]:

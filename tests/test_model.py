@@ -54,6 +54,8 @@ def test_clean_rationale():
     assert clean_rationale("Yes. Markings are consistent with U.S. road standards. Third.") == \
         "Yes. Markings are consistent with U.S. road standards."
     assert clean_rationale("Kanji signs. Cars drive on the left and the") == "Kanji signs."  # cut at token cap
+    assert clean_rationale("Road markings are standard in the U.S. The landscape is arid. Third sentence here.") == \
+        "Road markings are standard in the U.S. The landscape is arid."  # sentence ending in an abbreviation
     assert clean_rationale("   \n") == FALLBACK_RATIONALE
     assert clean_rationale(None) == FALLBACK_RATIONALE
 
@@ -73,6 +75,26 @@ def test_apply_temperature_keeps_order():
     assert rec["temperature"] == 3.0
     assert [t["country"] for t in rec["top3"]] == ["a", "b", "c"]
     assert rec["top3"][0]["p"] == round(softmax_with_temperature(rec["logprobs"], 3.0)["a"], 2)
+
+
+def test_max_pixels_caps_image_processor_size(monkeypatch):
+    # transformers 5.x Qwen image processors have no max_pixels attribute; the cap lives in ip.size.
+    import sys
+    from types import SimpleNamespace as NS
+    QwenFakeImageProcessor = type("Qwen2VLImageProcessor", (), {})
+    ip = QwenFakeImageProcessor()
+    ip.size = {"shortest_edge": 65536, "longest_edge": 16777216}
+    other = NS(size={"longest_edge": 1536})
+    fake_model = NS(to=lambda d: NS(eval=lambda: "model"))
+    monkeypatch.setitem(sys.modules, "transformers", NS(
+        AutoProcessor=NS(from_pretrained=lambda *a, **k: NS(tokenizer=None, image_processor=ip)),
+        AutoModelForImageTextToText=NS(from_pretrained=lambda *a, **k: fake_model)))
+    model.GeoModel({"model": {"model_id": "m", "revision": "r", "max_pixels": 262144}}, device="cpu")
+    assert ip.size == {"shortest_edge": 65536, "longest_edge": 262144}
+    monkeypatch.setitem(sys.modules["transformers"].__dict__, "AutoProcessor",
+                        NS(from_pretrained=lambda *a, **k: NS(tokenizer=None, image_processor=other)))
+    model.GeoModel({"model": {"model_id": "m", "revision": "r", "max_pixels": 262144}}, device="cpu")
+    assert other.size == {"longest_edge": 1536}  # non-Qwen: untouched
 
 
 def test_load_temperature(tmp_path, monkeypatch):

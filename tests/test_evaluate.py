@@ -103,6 +103,13 @@ def test_ece_tiny_hand_computed():
     assert ev.ece([1.0, 0.0], [1, 0], 10)[0] == pytest.approx(0.0)  # edges land in first/last bin
 
 
+def test_tercile_ties_stay_together():
+    df = pd.DataFrame({"ai_p1": [0.2, 0.3, 0.4, 0.5, 0.6, 0.7] + [1.0] * 6, "correct1": [0, 1] * 6})
+    for seed in range(5):
+        t = {r["tercile"]: r for r in ev.tercile_table(df.sample(frac=1, random_state=seed))}
+        assert t["mid"]["p1_max"] < 1.0 and t["high"]["p1_min"] == 1.0 and t["high"]["n"] == 6
+
+
 def test_bootstrap_ci_contains_point_and_is_seeded():
     vals = [1] * 30 + [0] * 70
     lo, hi = ev.bootstrap_ci(vals, 500, seed=1)
@@ -129,6 +136,8 @@ def test_core_metrics_eval_only(files):
     assert sum(r["n"] for r in t.values()) == 40
     assert t["low"]["acc"] == 0.0 and t["high"]["acc"] == 1.0
     assert t["low"]["p1_max"] <= t["mid"]["p1_min"] <= t["high"]["p1_min"]
+    assert (m["model_id"], m["revision"]) == ("Qwen/Qwen3-VL-2B-Instruct", "abc")
+    assert "abc" in json.loads((out / "metrics.json").read_text())["revision"]
     assert m["by_has_text"]["True"] == {"n": 25, "top1": 0.8, "top3": 1.0}
     assert m["by_has_text"]["False"]["n"] == 15 and m["by_has_text"]["False"]["top1"] == 0.0
     assert m["per_country"][LABELS[0]]["top1"] == 0.5
