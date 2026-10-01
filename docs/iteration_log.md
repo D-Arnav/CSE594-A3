@@ -51,21 +51,39 @@ Template for new entries:
 
 **Why:** this is the SPEC default design.
 
-**Dev metrics (n = _[TODO]_):**
+**Dev metrics (n = 200, MPS fp16, `max_pixels` 262144):**
 
-| Metric | T = 1.0 | T fitted = _[TODO]_ |
+| Metric | T = 1.0 | T fitted = 2.869 |
 |---|---|---|
-| Top-1 accuracy | _[TODO]_ | same (T does not change the ranking) |
-| Top-3 accuracy | _[TODO]_ | same |
-| MRR | _[TODO]_ | same |
-| NLL | _[TODO: nll_before]_ | _[TODO: nll_after]_ |
-| ECE (10 bins) | _[TODO]_ | _[TODO]_ |
-| Top-1 acc, has_text = True / False | _[TODO]_ / _[TODO]_ | |
-| Mean s/trial (score / explain), device | _[TODO]_ | |
+| Top-1 accuracy | 60.5% [54.0, 67.5] | same (T does not change the ranking) |
+| Top-3 accuracy | 79.5% [74.0, 85.0] | same |
+| MRR | 0.724 | same |
+| NLL | 2.324 | 1.435 |
+| ECE (10 bins) | 0.224 (mean top-1 p 0.83 vs 60.5% acc) | 0.082 |
+| Top-1 acc, has_text = True / False | 80% (n = 5) / 60% (n = 195) | |
+| Mean s/trial (score / explain), device | 1.07 / 4.16, MPS | |
 
-**Rationale spot-check (milestone 4, 20 dev images):** _[TODO: share generic / empty / contradicting the ranking]_
+Confidence terciles after T: low 35.4%, mid 57.6%, high 87.0% top-1 accuracy, so higher confidence is more
+reliable. Within-cluster share of top-1 errors: 39.2% of 79. Weakest: Argentina 20%, Ireland 30%,
+South Africa 30%; strongest: India and Australia 100%, United Kingdom 90%.
 
-**Decision:** _[TODO: within targets → freeze and run study / otherwise next lever]_
+**Image cap check.** A bug left the first partial run without the `max_pixels` cap (fixed in `3a86c7a`). On the
+same 78 dev trials, full resolution gave top-1 66.7% / top-3 82.1%, and the capped run 60.3% / 79.5%. Both
+are within target. The capped setting is kept because SPEC 5.1 asks for it, and it halves the image tokens.
+
+**Rationale spot-check (milestone 4, all 200 dev trials):**
+
+| Rationale | "No distinctive clues" | Opens with "Yes/No, this photo could…" |
+|---|---|---|
+| Top-1 | 42.0% | 55.5% |
+| Top-2 | 86.5% | 11.5% |
+| Top-3 | 98.5% | 1.0% |
+
+No top-1 rationale contradicts the ranking ("argues against", "unlikely": 0%).
+
+**Decision:** ranking and calibration are within the SPEC 0.3 targets, so Stage 1 is frozen. The rationales are
+too often empty to support verification in the human-AI condition. Per SPEC 9 the next lever is revising
+`PROMPT_EXPLAIN` on dev (entry 2).
 
 ---
 
@@ -105,10 +123,12 @@ The concern is that summed log p penalizes country names that split into more to
 
 | Scoring | Top-1 | Top-3 |
 |---|---|---|
-| Summed log p (used) | _[TODO]_ | _[TODO]_ |
-| Length-normalized | _[TODO]_ | _[TODO]_ |
-| Top-1 agreement between the two | _[TODO]_ | |
+| Summed log p (used) | 60.5% | 79.5% |
+| Length-normalized | 60.5% | 79.0% |
+| Top-1 agreement between the two | 98.0% | |
 
-Per-country effect (multi-token names): _[TODO: check per-country accuracy / predicted-label counts]_
+Per-country effect (multi-token names): the two rankings disagree on top-1 in only 4 of 200 trials (D030, D063,
+D081, D165). Normalizing gains one United States hit (D063) and loses one Brazil hit (D081). Every candidate is 1–3
+tokens, so length has little room to bias the sum.
 
-**Decision:** _[TODO: keep summed, or switch (this is a scoring change, so it would get a new entry above)]_
+**Decision:** keep summed log p (SPEC default); normalizing changes nothing material.

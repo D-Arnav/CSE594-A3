@@ -26,6 +26,16 @@ PROMPT_EXPLAIN = {
         "Only mention things you can actually see. If there are no useful clues,\n"
         'say "No distinctive clues."'
     ),
+    # v2: v1 gave "No distinctive clues." for 42% / 87% / 99% of top-1/2/3 rationales on dev and
+    # opened 56% of top-1 ones with "Yes, this photo could...". Drop the escape hatch and the opener.
+    "v2": (
+        "Consider whether this street-level photo was taken in {country}.\n"
+        "Name one or two specific things you can SEE in the image (road markings, which side cars\n"
+        "drive on, signs and their script, vegetation, terrain, architecture, utility poles, vehicles)\n"
+        "and say whether each fits {country}. Use at most two short sentences.\n"
+        'Start directly with what you see; do not begin with "Yes" or "No".\n'
+        "Only mention things that are actually visible."
+    ),
 }
 
 # SPEC 5.4 generative baseline (iteration log only). Same candidate list as the rank prompt.
