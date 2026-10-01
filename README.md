@@ -109,23 +109,16 @@ python src/build_dataset.py --config config.yaml --contact-sheet
 # smoke test: python src/build_dataset.py --config config.yaml --limit-countries 2 --pool-per-country 20
 ```
 
-Outputs: `data/{study,dev}/{S,D}NNN.jpg`, `data/{split}/{split}_meta.csv`, `data/raw/reserve_pool.csv`, and
-`data/build_log.txt`, which records filter counts, text counts per country and any substitution.
-`data/countries.txt` is written only if a country had too few candidates and was swapped for a backup.
+Outputs: `data/{study,dev}/{S,D}NNN.jpg`, `data/{split}/{split}_meta.csv`, and `data/build_log.txt`, which
+records filter counts, OCR text counts per country and any substitution. `data/countries.txt` is written only if
+a country had too few candidates and was swapped for a backup.
 
-**2. Manual screen** (SPEC 4.3 step 6, required). Open `data/study/contact_sheet.html` and
-`data/dev/contact_sheet.html`:
+`data.text_ratio: null` (the default) turns off the SPEC's 5 text + 5 no-text split, because EasyOCR at OSV-5M
+resolution finds almost no text (see `docs/iteration_log.md`). `has_text` is the OCR tag. Set `text_ratio: 0.5` to
+stratify on it.
 
-- Tick **exclude** for faces, readable plates, a visible country name or flag, or an unusable image.
-- Tick **readable text** for any sign a person could read.
-- Append the generated lists to `data/screen_exclude.txt` and `data/screen_text.txt`, one `source_id` per line;
-  an optional `# reason` comment is allowed. `screen_text.txt` must list every text image across both splits.
-- Re-run step 1. Excluded images are replaced from the reserve pool of the same country, and downloads and OCR
-  are cached, so the rebuild is fast.
-
-With `data.text_ratio: null` (the default), `has_text` comes from `screen_text.txt` and there is no text
-stratification. EasyOCR at OSV-5M resolution finds almost no text (see `docs/iteration_log.md`). Set
-`text_ratio: 0.5` to get the SPEC's 5 + 5 split from OCR tags.
+**2. Look over the images** (optional). `data/{study,dev}/contact_sheet.html` shows every image with its trial ID,
+country and OCR text. There is no manual exclusion step yet (SPEC 4.3 step 6); Mapillary blurs faces and plates.
 
 **3. Dev predictions + temperature fit** (SPEC 5.2, milestone 3):
 
@@ -268,7 +261,7 @@ RUN_NETWORK_TESTS=1 python -m pytest   # also downloads from Hugging Face
 - **Images:** [OpenStreetView-5M](https://huggingface.co/datasets/osv5m/osv5m) (`osv5m/osv5m`, test split),
   derived from [Mapillary](https://www.mapillary.com) street-level imagery and released under **CC-BY-SA 4.0**.
   Every row keeps its original `source_id` for attribution. Images in `data/` are redistributed under the same
-  license, and faces and plates are blurred by Mapillary and checked in the manual screen.
+  license, and faces and plates are blurred by Mapillary.
 - **Model:** [Qwen/Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct), **Apache-2.0**,
   pinned at revision `89644892e4d85e24eaac8bacfd4f463576704203`. The model ID and revision are logged in every
   output record and CSV row.

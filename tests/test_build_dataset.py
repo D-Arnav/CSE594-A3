@@ -94,51 +94,23 @@ def cands(n_text, n_notext):
 
 def test_assign_splits_stratified_and_disjoint():
     log = []
-    out, reserve = bd.assign_splits(cands(15, 15), QUOTAS, set(), log)
+    out = bd.assign_splits(cands(15, 15), QUOTAS, log)
     s, d = out["study"], out["dev"]
     assert len(s) == len(d) == 10 and not set(s) & set(d)
     assert sum(x.startswith("t") for x in s) == 5 and sum(x.startswith("t") for x in d) == 5
-    assert len(reserve) == 10 and not set(reserve) & (set(s) | set(d))
     assert log == []
 
 
 def test_assign_splits_fills_from_other_stratum_and_logs():
     log = []
-    out, reserve = bd.assign_splits(cands(7, 20), QUOTAS, set(), log, "Chile")
+    out = bd.assign_splits(cands(7, 20), QUOTAS, log, "Chile")
     assert sum(x.startswith("t") for x in out["study"]) == 5
     assert sum(x.startswith("t") for x in out["dev"]) == 2 and len(out["dev"]) == 10
     assert any(l.startswith("FILL Chile dev: 3 text short, filled 3") for l in log)
     log = []
-    out, _ = bd.assign_splits(cands(2, 3), QUOTAS, set(), log, "Chile")
+    out = bd.assign_splits(cands(2, 3), QUOTAS, log, "Chile")
     assert len(out["study"]) == 5 and out["dev"] == []
     assert any("SHORTFALL Chile study" in l for l in log)
-
-
-def test_assign_splits_exclusion_replaces_stably():
-    c = cands(15, 15)
-    base, base_res = bd.assign_splits(c, QUOTAS, set(), [])
-    victim_t = next(x for x in base["study"] if x.startswith("t"))
-    victim_n = next(x for x in base["dev"] if x.startswith("n"))
-    reserve_x = base_res[-1]
-    log = []
-    out, res = bd.assign_splits(c, QUOTAS, {victim_t, victim_n, reserve_x}, log)
-    for split, victim in (("study", victim_t), ("dev", victim_n)):
-        i = base[split].index(victim)
-        assert [x for j, x in enumerate(out[split]) if j != i] == [x for j, x in enumerate(base[split]) if j != i]
-        rep = out[split][i]
-        assert rep in base_res and rep[0] == victim[0]  # same stratum, from reserve
-    assert reserve_x not in res and len(res) == len(base_res) - 3
-    assert sum(l.startswith("REPLACE") for l in log) == 2
-
-
-def test_assign_splits_exclusion_other_stratum_or_empty():
-    c = [("t0", True), ("n0", False), ("n1", False)]
-    log = []
-    out, _ = bd.assign_splits(c, [("study", 1, 1)], {"t0"}, log)
-    assert out["study"] == ["n1", "n0"] and "other stratum" in log[-1]
-    log = []
-    out, _ = bd.assign_splits(c[:2], [("study", 1, 1)], {"t0"}, log)
-    assert out["study"] == [None, "n0"] and "reserve empty" in log[-1]
 
 
 def test_assign_trial_ids_is_seeded_permutation():
@@ -149,13 +121,6 @@ def test_assign_trial_ids_is_seeded_permutation():
     assert bd.assign_trial_ids(3, "D", 42)[0].startswith("D")
 
 
-def test_read_exclusions(tmp_path):
-    p = tmp_path / "x.txt"
-    p.write_text("123  # flag visible\n\n# whole-line comment\n456\n")
-    assert bd.read_exclusions(p) == {"123", "456"}
-    assert bd.read_exclusions(tmp_path / "missing.txt") == set()
-
-
 @pytest.fixture
 def fake_repo(tmp_path, monkeypatch):
     """Offline build: synthetic metadata, images and OCR; all paths under tmp_path."""
@@ -163,8 +128,7 @@ def fake_repo(tmp_path, monkeypatch):
     raw = data / "raw"
     for name, val in {"ROOT": tmp_path, "DATA": data, "RAW": raw, "IMG_DIR": raw / "images",
                       "INDEX_CSV": raw / "test_index.csv", "OCR_CACHE": raw / "ocr_cache.csv",
-                      "RESERVE_CSV": raw / "reserve_pool.csv", "EXCLUDE_FILE": data / "screen_exclude.txt",
-                      "TEXT_FILE": data / "screen_text.txt", "LOG_FILE": data / "build_log.txt"}.items():
+                      "LOG_FILE": data / "build_log.txt"}.items():
         monkeypatch.setattr(bd, name, val)
     rng = np.random.default_rng(0)
     rows = []
@@ -189,7 +153,7 @@ def fake_repo(tmp_path, monkeypatch):
     return cfg, data
 
 
-def test_build_end_to_end_and_stable_exclusion(fake_repo):
+def test_build_end_to_end_and_deterministic(fake_repo):
     cfg, data = fake_repo
     bd.build(cfg, contact_sheet=True, pool=20)
     s1 = pd.read_csv(data / "study" / "study_meta.csv", dtype={"source_id": str})
@@ -205,33 +169,17 @@ def test_build_end_to_end_and_stable_exclusion(fake_repo):
     log = (data / "build_log.txt").read_text()
     assert "FILTER" in log and "WROTE study: 12" in log
 
-    victim = s1.iloc[0]
-    (data / "screen_exclude.txt").write_text(f"{victim.source_id}  # flag visible\n")
-    bd.build(cfg, pool=20)
-    s2 = pd.read_csv(data / "study" / "study_meta.csv", dtype={"source_id": str})
-    d2 = pd.read_csv(data / "dev" / "dev_meta.csv", dtype={"source_id": str})
-    changed = s2[s2.source_id != s1.source_id]
-    assert list(changed.trial_id) == [victim.trial_id]
-    assert changed.iloc[0].country == victim.country and changed.iloc[0].has_text == victim.has_text
-    assert d2.equals(d1)
-    reserve = pd.read_csv(data / "raw" / "reserve_pool.csv", dtype={"source_id": str})
-    assert victim.source_id not in set(reserve.source_id)
-    assert not set(reserve.source_id) & (set(s2.source_id) | set(d2.source_id))
+    bd.build(cfg, pool=20)  # deterministic rebuild
+    assert pd.read_csv(data / "study" / "study_meta.csv", dtype={"source_id": str}).equals(s1)
 
 
-def test_build_unstratified_with_manual_text_labels(fake_repo):
+def test_build_unstratified(fake_repo):
     cfg, data = fake_repo
     cfg["data"]["text_ratio"] = None
     bd.build(cfg, pool=20)
     s1 = pd.read_csv(data / "study" / "study_meta.csv", dtype={"source_id": str})
     assert len(s1) == 12 and s1.groupby("country").size().eq(4).all()
-    labeled = set(s1.source_id[:3])
-    (data / "screen_text.txt").write_text("\n".join(labeled) + "\n")
-    bd.build(cfg, pool=20, contact_sheet=True)
-    s2 = pd.read_csv(data / "study" / "study_meta.csv", dtype={"source_id": str})
-    assert s2.source_id.equals(s1.source_id)  # labels never move images
-    assert set(s2.source_id[s2.has_text]) == labeled
-    assert 'class="tx"' in (data / "study" / "contact_sheet.html").read_text()
+    assert "FILL" not in (data / "build_log.txt").read_text()
 
 
 def test_build_writes_countries_txt_on_substitution(fake_repo):

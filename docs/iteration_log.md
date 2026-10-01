@@ -46,8 +46,8 @@ Template for new entries:
 - Temperature: T = 1.0 in config, then fitted on dev with `--fit-temperature` → `outputs/temperature.json`.
 - **Deviation from SPEC 4.3 step 5:** `data.text_ratio: null`, so there is no 5 text + 5 no-text stratification.
   EasyOCR (`ocr_conf 0.5`, `ocr_min_chars 3`) flags very few OSV-5M images as having text; the counts are in the
-  `TEXT <country>:` lines of `data/build_log.txt`: _[TODO: total OCR-text / candidates]_. `has_text` therefore
-  comes from the manual screen (`data/screen_text.txt`).
+  `TEXT <country>:` lines of `data/build_log.txt`: 35 OCR-text out of 1,198 candidates, mostly dashcam
+  overlays, not street signs. `has_text` is kept as the OCR tag for analysis only.
 
 **Why:** this is the SPEC default design.
 

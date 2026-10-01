@@ -12,8 +12,8 @@ data:
   pool_per_country: 60     # candidates downloaded per country before filtering
   per_country_study: 10
   per_country_dev: 10
-  text_ratio: null         # null = no text stratification; has_text comes from the manual screen
-                           # (data/screen_text.txt). OCR finds ~0 text on OSV-5M; see iteration_log.
+  text_ratio: null         # null = no text stratification (OCR finds ~0 text on OSV-5M; see
+                           # iteration_log). has_text is the OCR tag, kept for analysis.
   ocr_gpu: true
   min_distance_km: 25
   min_short_side: 256

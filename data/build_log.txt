@@ -1,4 +1,4 @@
-build 2026-10-01T11:40:12 seed=42 pool=60
+build 2026-10-01T11:45:17 seed=42 pool=60
 POOL United States: 60 of 23875, 0 closer than 25 km to another
 POOL Canada: 60 of 9580, 0 closer than 25 km to another
 POOL Mexico: 60 of 4759, 0 closer than 25 km to another
@@ -42,6 +42,5 @@ TEXT India: 1 OCR-text / 59 no-text candidates
 TEXT Thailand: 2 OCR-text / 58 no-text candidates
 TEXT South Africa: 0 OCR-text / 60 no-text candidates
 TEXT Australia: 3 OCR-text / 57 no-text candidates
-reserve pool: 798 -> data/raw/reserve_pool.csv
 WROTE study: 200 images, has_text=9
 WROTE dev: 200 images, has_text=5

@@ -2,8 +2,8 @@
 
 Pipeline: metadata -> country check/backups -> per-country spread-out candidate pool ->
 download (cached) -> quality filter + phash dedup -> EasyOCR text tagging (cached) ->
-(optionally text-stratified) disjoint study/dev sampling -> screen exclusions replaced from reserve ->
-data/{split}/{S,D}NNN.jpg + {split}_meta.csv, data/raw/reserve_pool.csv, data/build_log.txt.
+(optionally text-stratified) disjoint study/dev sampling ->
+data/{split}/{S,D}NNN.jpg + {split}_meta.csv, data/build_log.txt.
 
     python src/build_dataset.py --config config.yaml [--splits study dev] [--contact-sheet]
                                 [--limit-countries N] [--pool-per-country N]
@@ -30,9 +30,6 @@ RAW = DATA / "raw"
 IMG_DIR = RAW / "images"
 INDEX_CSV = RAW / "test_index.csv"
 OCR_CACHE = RAW / "ocr_cache.csv"
-RESERVE_CSV = RAW / "reserve_pool.csv"
-EXCLUDE_FILE = DATA / "screen_exclude.txt"
-TEXT_FILE = DATA / "screen_text.txt"  # manual has_text labels from the screen
 LOG_FILE = DATA / "build_log.txt"
 SPLIT_PREFIX = {"study": "S", "dev": "D"}
 META_COLS = ["trial_id", "image_path", "source_id", "country", "cluster", "lat", "lon",
@@ -157,15 +154,13 @@ def resolve_countries(counts, primary, backups, min_n, log):
     return active
 
 
-def assign_splits(cands, quotas, exclude, log, country=""):
+def assign_splits(cands, quotas, log, country=""):
     """Stratified, disjoint assignment of one country's candidates.
 
     cands: [(source_id, has_text)] in seeded order. quotas: [(split, n_text, n_notext)] in fill
-    order. Base assignment ignores exclusions so every non-excluded slot is stable; an excluded
-    pick is then replaced by the first reserve item of the same stratum (other stratum if none).
-    Returns ({split: [source_id, ...]}, reserve [source_id, ...]); slot order is kept.
+    order. A short stratum is filled from the other one and logged.
+    Returns {split: [source_id, ...]}.
     """
-    has = dict(cands)
     pools = {True: [s for s, t in cands if t], False: [s for s, t in cands if not t]}
     out = {}
     for split, n_text, n_notext in quotas:
@@ -183,22 +178,7 @@ def assign_splits(cands, quotas, exclude, log, country=""):
                     log.append(f"SHORTFALL {country} {split}: missing {n - len(take)}")
             picks += take
         out[split] = picks
-    reserve = [s for s, _ in cands if s not in exclude and not any(s in p for p in out.values())]
-    for split, picks in out.items():
-        for i, sid in enumerate(picks):
-            if sid not in exclude:
-                continue
-            same = [r for r in reserve if has[r] == has[sid]]
-            rep = (same or reserve or [None])[0]
-            if rep is None:
-                log.append(f"SHORTFALL {country} {split}: excluded {sid}, reserve empty")
-            else:
-                reserve.remove(rep)
-                note = "" if same else " (other stratum)"
-                log.append(f"REPLACE {country} {split}: excluded {sid} -> {rep}{note}")
-            picks[i] = rep
-        out[split] = picks  # None marks a slot left empty
-    return out, reserve
+    return out
 
 
 def assign_trial_ids(n, prefix, seed):
@@ -206,14 +186,6 @@ def assign_trial_ids(n, prefix, seed):
     shuffle keeps IDs from leaking country."""
     order = np.random.default_rng([seed, zlib.crc32(prefix.encode())]).permutation(n)
     return [f"{prefix}{j + 1:03d}" for j in order]
-
-
-def read_exclusions(path):
-    """source_ids, one per line, optional '# reason'."""
-    if not Path(path).exists():
-        return set()
-    lines = (l.split("#", 1)[0].strip() for l in Path(path).read_text().splitlines())
-    return {l for l in lines if l}
 
 
 def country_rng(seed, country):
@@ -315,29 +287,14 @@ def run_ocr(jobs, gpu):
 
 
 def write_contact_sheet(meta, split_dir):
-    """HTML grid for the manual screen. Tick boxes, then copy the generated lists into
-    data/screen_exclude.txt and data/screen_text.txt and rebuild."""
     cells = "\n".join(
-        f'<figure><a href="{Path(r.image_path).name}" target="_blank"><img src="{Path(r.image_path).name}" '
-        f'loading="lazy"></a><figcaption><b>{r.trial_id}</b> {html.escape(r.country)} &middot; {r.source_id}<br>'
-        f'<label><input type="checkbox" class="ex" value="{r.source_id}"> exclude</label> '
-        f'<label><input type="checkbox" class="tx" value="{r.source_id}"{" checked" if r.has_text else ""}> '
-        f'readable text</label><br><small>OCR: {html.escape(str(r.ocr_text))}</small></figcaption></figure>'
+        f'<figure><img src="{Path(r.image_path).name}" loading="lazy"><figcaption><b>{r.trial_id}</b> '
+        f'{html.escape(r.country)} &middot; {r.source_id}<br>{html.escape(str(r.ocr_text))}</figcaption></figure>'
         for r in meta.itertuples())
-    script = """<script>
-function upd(){for(const k of ['ex','tx'])document.getElementById(k+'-out').value=
-[...document.querySelectorAll('input.'+k+':checked')].map(e=>e.value).join('\\n')}
-document.addEventListener('change',upd);upd();</script>"""
     (split_dir / "contact_sheet.html").write_text(
         "<!doctype html><meta charset='utf-8'><title>Contact sheet</title><style>"
-        "body{font:13px sans-serif}main{display:flex;flex-wrap:wrap;gap:8px}"
-        "figure{margin:0;width:340px}img{width:100%}textarea{width:45%;height:8em}</style>\n"
-        "<p>Exclude: faces, readable plates, country names/flags, unusable images. Readable text: any sign "
-        "a person could read. Append the lists below to data/screen_exclude.txt and data/screen_text.txt "
-        "(screen_text must list every text image across both splits), then rebuild.</p>"
-        "<p>screen_exclude.txt<br><textarea id='ex-out' readonly></textarea></p>"
-        "<p>screen_text.txt<br><textarea id='tx-out' readonly></textarea></p>"
-        "<main>\n" + cells + "</main>" + script)
+        "body{font:13px sans-serif;display:flex;flex-wrap:wrap;gap:8px}"
+        "figure{margin:0;width:340px}img{width:100%}</style>\n" + cells)
 
 
 # ---------- main ----------
@@ -400,43 +357,30 @@ def build(cfg, splits=("study", "dev"), contact_sheet=False, limit_countries=Non
     ok -= overlay
     log.append(f"FILTER gps-overlay={len(overlay)} kept={len(ok)}")
 
-    # 4. stratified disjoint sampling + screen exclusions
-    exclude = read_exclusions(EXCLUDE_FILE)
-    if exclude:
-        log.append(f"screen exclusions: {len(exclude)}")
+    # 4. stratified disjoint sampling
     # ponytail: text_ratio null = no text stratification. EasyOCR at OSV-5M resolution finds
-    # ~0 readable text in most countries, so has_text comes from the manual screen instead.
+    # ~0 readable text in most countries, so 5+5 per country is not reachable.
     ratio = d.get("text_ratio")
     quotas = []
     for s in ("study", "dev"):  # always both, so either split is stable on its own
         n = d[f"per_country_{s}"]
         nt = round(n * ratio) if ratio is not None else 0
         quotas.append((s, nt, n - nt))
-    manual_text = read_exclusions(TEXT_FILE) if TEXT_FILE.exists() else None
-    if manual_text is not None:
-        log.append(f"has_text from manual screen ({TEXT_FILE.name}): {len(manual_text)} ids")
     slots = {s: [] for s, _, _ in quotas}
-    reserve = []
     for c in active:
         cands = [(i, tags[i][0] if ratio is not None else False) for i in pools[c]["id"] if i in ok]
         nt = sum(tags[i][0] for i, _ in cands)
         log.append(f"TEXT {c}: {nt} OCR-text / {len(cands) - nt} no-text candidates")
-        picks, res = assign_splits(cands, quotas, exclude, log, c)
+        picks = assign_splits(cands, quotas, log, c)
         for s in picks:
             slots[s] += [(c, sid) for sid in picks[s]]
-        reserve += [(c, sid) for sid in res]
 
     lat = {r.id: (r.latitude, r.longitude) for c in active for r in pools[c].itertuples()}
 
     def row(c, sid):
         has, text, script = tags[sid]
-        if manual_text is not None:
-            has = sid in manual_text
         return {"source_id": sid, "country": c, "cluster": CLUSTER_OF[c], "lat": lat[sid][0],
                 "lon": lat[sid][1], "has_text": has, "ocr_text": text, "script": script}
-
-    pd.DataFrame([row(c, s) for c, s in reserve]).to_csv(RESERVE_CSV, index=False)
-    log.append(f"reserve pool: {len(reserve)} -> {RESERVE_CSV.relative_to(ROOT)}")
 
     # 5. write images + meta
     for s in splits:
@@ -448,8 +392,6 @@ def build(cfg, splits=("study", "dev"), contact_sheet=False, limit_countries=Non
             old.unlink()
         rows = []
         for tid, (c, sid) in zip(ids, slots[s]):
-            if sid is None:
-                continue
             dst = out_dir / f"{tid}.jpg"
             shutil.copyfile(IMG_DIR / f"{sid}.jpg", dst)
             rows.append({"trial_id": tid, "image_path": dst.relative_to(ROOT).as_posix(),
