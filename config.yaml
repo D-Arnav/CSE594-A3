@@ -36,7 +36,7 @@ inference:
   score_batch_size: 5
   n_orderings: 1           # >1 averages logprobs over shuffled orderings (position bias)
   baseline_max_new_tokens: 512
-  prompt_versions: {rank: v1, explain: v1}
+  prompt_versions: {rank: v1, explain: v2}   # explain v2: see iteration_log entry 2
 
 eval:
   ece_bins: 10

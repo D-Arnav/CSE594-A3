@@ -87,6 +87,32 @@ too often empty to support verification in the human-AI condition. Per SPEC 9 th
 
 ---
 
+## 2. Explain prompt v2 — 2026-10-06
+
+- **Changed:** `inference.prompt_versions.explain` v1 → v2 (`src/prompts.py`). v2 drops v1's
+  "If there are no useful clues, say 'No distinctive clues.'" escape hatch. It asks for one or two specific
+  visible things and whether each fits the country, and forbids opening with "Yes"/"No". Ranking is unchanged
+  (rank v1, same T).
+- **Why:** entry 1. v1 rationales were mostly "No distinctive clues." (42% / 87% / 99% for ranks 1/2/3), so the
+  human-AI cards gave almost no evidence to verify.
+- **Dev A/B:** first 40 dev trials × 3 ranks, same top-3 (`outputs/dev/explain_ab/`):
+
+| Prompt | "No distinctive clues" (rank 1/2/3) | Opens "Yes/No" | Mean length | Distinct openings per trial (of 3) |
+|---|---|---|---|---|
+| v1 | 42% / 90% / 100% | 98% | 57 chars | — |
+| v2 | 0% / 0% / 0% | 0% | 189 chars | 1.48 |
+| v3 (one clue for, one against) | 0% / 0% / 0% | 0% | 191 chars | 2.17 |
+
+- **Observations:** v2 cites concrete, checkable things (road lines, signs and script, vegetation, a KFC sign).
+  Some claims are false, e.g. "vehicles are driving on the right" for Australia (D005) and Japan (D024). These are
+  the human-catchable HAL errors the study is built around. The three cards for one image often read alike,
+  because the model mostly describes the scene rather than arguing for each country. v3 was more distinct per
+  card, but the model copied the template ("First sentence: …, and why.") in 97.5% of outputs and its
+  arguments were weak (e.g. "KFC sign … common in the United States" for a Japanese street).
+- **Decision:** keep v2 for dev and study. Accuracy and calibration are unaffected.
+
+---
+
 ## JSON generative baseline (SPEC 5.4)
 
 ```bash
@@ -99,18 +125,25 @@ confidences and reasoning (`PROMPT_JSON_BASELINE` v1, `baseline_max_new_tokens: 
 
 | Metric | Value |
 |---|---|
-| n | _[TODO]_ |
-| Parse-failure rate | _[TODO]_ |
-| Truncated at token cap | _[TODO]_ |
-| Not exactly 3 guesses (of parsed) | _[TODO]_ |
-| Guesses outside the label set | _[TODO]_ |
-| Missing confidence (of parsed) | _[TODO]_ |
-| Mean confidence sum / share within 0.05 of 1 / share > 1.05 | _[TODO]_ / _[TODO]_ / _[TODO]_ |
-| Top-1 / top-3 accuracy (parsed only) | _[TODO]_ / _[TODO]_ |
-| Top-1 / top-3 accuracy (all, failures count as wrong) | _[TODO]_ / _[TODO]_ |
-| Two-stage pipeline, same dev set: top-1 / top-3 | _[TODO]_ / _[TODO]_ |
+| n | 200 |
+| Parse-failure rate | 0.5% (1 of 200) |
+| Truncated at token cap | 0.5% |
+| Not exactly 3 guesses (of parsed) | 0% |
+| Guesses outside the label set | 0% |
+| Missing confidence (of parsed) | 0% |
+| Mean confidence sum / share within 0.05 of 1 / share > 1.05 | 2.14 / 0% / 91.5% |
+| Top-1 / top-3 accuracy (parsed only) | 58.8% / 76.9% |
+| Top-1 / top-3 accuracy (all, failures count as wrong) | 58.5% / 76.5% |
+| Two-stage pipeline, same dev set: top-1 / top-3 | 60.5% / 79.5% |
+| Mean seconds per trial (MPS) | about 13 (two-stage: 5.2 incl. 3 rationales) |
 
-**Takeaway:** _[TODO: does this justify likelihood ranking over free-form JSON?]_
+**Takeaway:** SPEC 5.4 expected invalid JSON and out-of-label guesses. Qwen3-VL-2B produces neither: its JSON
+parses 99.5% of the time and its accuracy is close to the two-stage ranking (58.5% vs 60.5% top-1). The two-stage
+design is still justified, but by the confidences, not by format or accuracy. The baseline's confidences
+never sum to 1 (mean sum 2.14), so they cannot be read as probabilities or calibrated. The likelihood scores give
+a proper distribution over all 20 countries that temperature scaling calibrates (ECE 0.082). They also give a full
+ranking for `gt_rank`/MRR, and are about 2.5× faster per trial. Participants rely on the confidence numbers, so
+this is the property that matters for the study.
 
 ---
 
