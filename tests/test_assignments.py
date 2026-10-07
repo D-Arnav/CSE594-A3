@@ -14,7 +14,8 @@ from common import CLUSTER_OF, load_config, countries  # noqa: E402
 def study_rows(seed=0):
     rng = random.Random(seed)
     rows = []
-    for i, c in enumerate(countries(load_config()) * 10):
+    labels = countries(load_config())
+    for i, c in enumerate(labels * (200 // len(labels))):  # the real study size
         rows.append({"trial_id": f"S{i + 1:03d}", "country": c, "cluster": CLUSTER_OF[c],
                      "ai_correct_top1": rng.random() < 0.55})
     return rows
@@ -32,8 +33,10 @@ def test_make_sets_partition_and_stratification(size):
     correct = [sum(by_id[t]["ai_correct_top1"] for t in s) for s in sets]
     assert max(correct) - min(correct) <= 1
     for s in sets:
-        assert max(Counter(by_id[t]["country"] for t in s).values()) <= 2
-        assert len({by_id[t]["cluster"] for t in s}) >= size // 2
+        n_countries = len({r["country"] for r in rows})
+        per_country = Counter(by_id[t]["country"] for t in s)
+        assert max(per_country.values()) <= -(-size // n_countries) + 1  # spread, not lumped
+        assert len(per_country) >= min(n_countries, size // 2)
     assert make_sets(rows, size, seed=42) == sets  # deterministic
 
 

@@ -9,6 +9,11 @@ import evaluate as ev
 from common import CLUSTER_OF, ROOT, load_config
 
 CFG = load_config()
+# Synthetic data uses its own 20-country label space (independent of config.yaml's study countries).
+CFG["data"]["countries"] = ["United States", "Canada", "Mexico", "Brazil", "Argentina", "Chile",
+                            "United Kingdom", "Ireland", "France", "Spain", "Italy", "Germany",
+                            "Russia", "Poland", "Japan", "South Korea", "India", "Thailand",
+                            "South Africa", "Australia"]
 CFG["eval"]["bootstrap"] = 200
 LABELS = list(CFG["data"]["countries"])
 COLS = ["trial_id", "image_path", "source_id", "country", "cluster", "has_text",

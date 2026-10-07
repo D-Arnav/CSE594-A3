@@ -3,7 +3,7 @@
 Sets: the 200 study trials are sorted by (ai_correct_top1, cluster, country,
 seeded tiebreak) and dealt round-robin into n_sets = 200 // block_size sets,
 so every set gets an even share of AI-correct/incorrect trials and a spread
-of clusters/countries (no country appears more than twice in a set). With
+of clusters/countries (each country spread across sets). With
 block_size 6 that is 33 sets and the 2 left-over trials are never shown.
 
 Rotation (cycle = 2 * n_sets participants, i.e. 50 for blocks of 8):

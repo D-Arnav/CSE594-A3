@@ -1,7 +1,9 @@
-"""Build the study and dev image sets from the OSV-5M test split (SPEC section 4).
+"""Build the study and dev image sets from OSV-5M (SPEC section 4).
 
-Pipeline: metadata -> country check/backups -> per-country spread-out candidate pool ->
+Pipeline: metadata (data.source_split) -> country check/backups -> urban filter (data.cities) ->
+per-country spread-out candidate pool ->
 download (cached) -> quality filter + phash dedup -> EasyOCR text tagging (cached) ->
+CLIP "street with visible cues" ranking (cached) ->
 (optionally text-stratified) disjoint study/dev sampling ->
 data/{split}/{S,D}NNN.jpg + {split}_meta.csv, data/build_log.txt.
 
@@ -28,7 +30,8 @@ from common import CLUSTER_OF, DATA, ISO2, ROOT, load_config  # noqa: E402
 
 RAW = DATA / "raw"
 IMG_DIR = RAW / "images"
-INDEX_CSV = RAW / "test_index.csv"
+INDEX_CSV = None  # default: RAW / f"{split}_index.csv"
+CLIP_CACHE = RAW / "clip_cache.csv"
 OCR_CACHE = RAW / "ocr_cache.csv"
 LOG_FILE = DATA / "build_log.txt"
 SPLIT_PREFIX = {"study": "S", "dev": "D"}
@@ -194,48 +197,59 @@ def country_rng(seed, country):
 
 # ---------- I/O stages ----------
 
-def load_meta(repo):
-    path = RAW / "test.csv"
+def load_meta(repo, split="test", iso=None):
+    """id/lat/lon/country rows of OSV-5M {split}.csv, optionally only the given ISO2 codes.
+    The train csv is 2.9 GB, so filtered reads are chunked and cached."""
+    path = RAW / f"{split}.csv"
     if not path.exists():
         from huggingface_hub import hf_hub_download
-        hf_hub_download(repo, "test.csv", repo_type="dataset", local_dir=RAW)
-    return pd.read_csv(path, usecols=["id", "latitude", "longitude", "country"],
-                       dtype={"id": str, "country": str}, keep_default_na=False)
+        hf_hub_download(repo, f"{split}.csv", repo_type="dataset", local_dir=RAW)
+    kw = dict(usecols=["id", "latitude", "longitude", "country"], dtype={"id": str, "country": str},
+              keep_default_na=False)  # keep_default_na: Namibia is "NA"
+    if iso is None:
+        return pd.read_csv(path, **kw)
+    cache = RAW / f"{split}_meta_{'-'.join(sorted(iso))}.csv"
+    if cache.exists():
+        return pd.read_csv(cache, **kw)
+    m = pd.concat(c[c["country"].isin(iso)] for c in pd.read_csv(path, chunksize=500_000, **kw))
+    m.to_csv(cache, index=False)
+    return m
 
 
-def zip_paths(repo):
+def zip_paths(repo, split="test"):
     from huggingface_hub import HfFileSystem
     fs = HfFileSystem()
-    return fs, sorted(fs.glob(f"datasets/{repo}/images/test/*.zip"))
+    return fs, sorted(fs.glob(f"datasets/{repo}/images/{split}/*.zip"))
 
 
-def build_index(repo):
-    """id -> (zip, member) for every test image; cached to data/raw/test_index.csv."""
-    if INDEX_CSV.exists():
-        return pd.read_csv(INDEX_CSV, dtype=str)
-    fs, zips = zip_paths(repo)
+def build_index(repo, split="test"):
+    """id -> (zip, member) for every image of the split; cached to data/raw/{split}_index.csv."""
+    path = INDEX_CSV or RAW / f"{split}_index.csv"
+    if path.exists():
+        return pd.read_csv(path, dtype=str)
+    fs, zips = zip_paths(repo, split)
     rows = []
     for z in zips:
         with fs.open(z, "rb", block_size=1 << 20) as f, zipfile.ZipFile(f) as zf:
             rows += [(Path(m).stem, Path(z).name, m) for m in zf.namelist() if m.endswith(".jpg")]
     idx = pd.DataFrame(rows, columns=["id", "zip", "member"])
-    INDEX_CSV.parent.mkdir(parents=True, exist_ok=True)
-    idx.to_csv(INDEX_CSV, index=False)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    idx.to_csv(path, index=False)
     return idx
 
 
-def download_images(ids, index, repo, img_dir=IMG_DIR, workers=8):
+def download_images(ids, index, repo, img_dir=IMG_DIR, workers=8, split="test"):
     """Fetch only the listed images out of the remote zips (random access, parallel). Resumable."""
     from concurrent.futures import ThreadPoolExecutor
     img_dir.mkdir(parents=True, exist_ok=True)
     todo = index[index["id"].isin([i for i in ids if not (img_dir / f"{i}.jpg").exists()])]
     if todo.empty:
         return 0
-    fs, _ = zip_paths(repo)
+    fs, _ = zip_paths(repo, split)
 
     def fetch(job):  # one zip handle per job; jobs split each zip's members across workers
         z, rows = job
-        with fs.open(f"datasets/{repo}/images/test/{z}", "rb", block_size=1 << 18) as f, \
+        with fs.open(f"datasets/{repo}/images/{split}/{z}", "rb", block_size=1 << 18) as f, \
                 zipfile.ZipFile(f) as zf:
             for sid, member in rows:
                 tmp = img_dir / f"{sid}.jpg.part"
@@ -286,6 +300,42 @@ def run_ocr(jobs, gpu):
     return {j[0]: cache[j[0]] for j in jobs}
 
 
+def near_city(lat, lon, centers, radius_km):
+    """Mask of points within radius_km of any [lat, lon] center (all True if no centers)."""
+    lat, lon = np.asarray(lat, float), np.asarray(lon, float)
+    if not centers:
+        return np.ones(len(lat), bool)
+    return np.min([haversine_km(lat, lon, a, b) for a, b in centers], axis=0) <= radius_km
+
+
+def clip_scores(paths, prompts, model_id):
+    """{source_id: p(prompts[0])} from CLIP softmax over prompts, cached per (model, prompts)."""
+    key = f"{model_id}|{'|'.join(prompts)}"
+    cache = {}
+    if CLIP_CACHE.exists():
+        c = pd.read_csv(CLIP_CACHE, dtype={"source_id": str})
+        cache = dict(zip(c.loc[c["key"] == key, "source_id"], c.loc[c["key"] == key, "score"]))
+    todo = {sid: p for sid, p in paths.items() if sid not in cache}
+    if todo:
+        import torch
+        from PIL import Image
+        from transformers import CLIPModel, CLIPProcessor
+        dev = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+        model, proc = CLIPModel.from_pretrained(model_id).to(dev).eval(), CLIPProcessor.from_pretrained(model_id)
+        items, new = list(todo.items()), []
+        for k in range(0, len(items), 32):
+            batch = items[k:k + 32]
+            imgs = [Image.open(p).convert("RGB") for _, p in batch]
+            inp = proc(text=prompts, images=imgs, return_tensors="pt", padding=True).to(dev)
+            with torch.no_grad():
+                prob = model(**inp).logits_per_image.softmax(-1)[:, 0].tolist()
+            new += [(sid, round(x, 5), key) for (sid, _), x in zip(batch, prob)]
+        pd.DataFrame(new, columns=["source_id", "score", "key"]).to_csv(
+            CLIP_CACHE, mode="a", header=not CLIP_CACHE.exists(), index=False)
+        cache.update({sid: x for sid, x, _ in new})
+    return {sid: cache[sid] for sid in paths}
+
+
 def write_contact_sheet(meta, split_dir):
     cells = "\n".join(
         f'<figure><img src="{Path(r.image_path).name}" loading="lazy"><figcaption><b>{r.trial_id}</b> '
@@ -307,7 +357,10 @@ def build(cfg, splits=("study", "dev"), contact_sheet=False, limit_countries=Non
     log = [f"build {datetime.now().isoformat(timespec='seconds')} seed={seed} pool={pool}"]
 
     DATA.mkdir(parents=True, exist_ok=True)
-    meta = load_meta(repo)
+    split = d.get("source_split", "test")
+    log.append(f"source split: {split}")
+    iso = [ISO2[c] for c in list(d["countries"]) + d.get("backup_countries", [])]
+    meta = load_meta(repo, split, iso if split != "test" else None)
     counts = meta["country"].value_counts().to_dict()
     primary = list(d["countries"])
     active = resolve_countries(counts, primary, d.get("backup_countries", []), d["min_candidates"], log)
@@ -318,13 +371,17 @@ def build(cfg, splits=("study", "dev"), contact_sheet=False, limit_countries=Non
         active = active[:limit_countries]
         log.append(f"limit-countries: {active}")
 
-    index = build_index(repo)
+    index = build_index(repo, split)
     meta = meta[meta["id"].isin(set(index["id"]))]
 
-    # 1. spread-out candidate pool per country
+    # 1. (urban) spread-out candidate pool per country
+    cities, radius = d.get("cities") or {}, d.get("city_radius_km", 15)
     pools = {}
     for c in active:
         rows = meta[meta["country"] == ISO2[c]].reset_index(drop=True)
+        if c in cities:
+            rows = rows[near_city(rows["latitude"], rows["longitude"], cities[c], radius)].reset_index(drop=True)
+            log.append(f"URBAN {c}: {len(rows)} within {radius} km of {len(cities[c])} city centers")
         idx = spread_sample(rows["latitude"], rows["longitude"], pool, d["min_distance_km"],
                             country_rng(seed, c))
         pools[c] = rows.iloc[idx]
@@ -333,7 +390,7 @@ def build(cfg, splits=("study", "dev"), contact_sheet=False, limit_countries=Non
     all_ids = [i for c in active for i in pools[c]["id"]]
 
     t = time.time()
-    n_dl = download_images(all_ids, index, repo)
+    n_dl = download_images(all_ids, index, repo, split=split)
     if n_dl:
         log.append(f"downloaded {n_dl} images, {(time.time() - t) / n_dl:.2f} s/img")
 
@@ -357,6 +414,19 @@ def build(cfg, splits=("study", "dev"), contact_sheet=False, limit_countries=Non
     ok -= overlay
     log.append(f"FILTER gps-overlay={len(overlay)} kept={len(ok)}")
 
+    # 3b. rank by CLIP "street with visible cues" score; keep the best study+dev per country
+    need = d["per_country_study"] + d["per_country_dev"]
+    order = {c: [i for i in pools[c]["id"] if i in ok] for c in active}
+    if d.get("clip_prompts"):
+        sc = clip_scores({i: IMG_DIR / f"{i}.jpg" for c in active for i in order[c]},
+                         d["clip_prompts"], d.get("clip_model", "openai/clip-vit-base-patch32"))
+        for c in active:
+            best = sorted(order[c], key=lambda i: -sc[i])[:need]
+            log.append(f"CLIP {c}: kept {len(best)} of {len(order[c])}, score >= {sc[best[-1]]:.3f}"
+                       if best else f"CLIP {c}: no candidates")
+            # seeded shuffle so study and dev get the same mix
+            order[c] = [best[k] for k in country_rng(seed, c).permutation(len(best))]
+
     # 4. stratified disjoint sampling
     # ponytail: text_ratio null = no text stratification. EasyOCR at OSV-5M resolution finds
     # ~0 readable text in most countries, so 5+5 per country is not reachable.
@@ -368,7 +438,7 @@ def build(cfg, splits=("study", "dev"), contact_sheet=False, limit_countries=Non
         quotas.append((s, nt, n - nt))
     slots = {s: [] for s, _, _ in quotas}
     for c in active:
-        cands = [(i, tags[i][0] if ratio is not None else False) for i in pools[c]["id"] if i in ok]
+        cands = [(i, tags[i][0] if ratio is not None else False) for i in order[c]]
         nt = sum(tags[i][0] for i, _ in cands)
         log.append(f"TEXT {c}: {nt} OCR-text / {len(cands) - nt} no-text candidates")
         picks = assign_splits(cands, quotas, log, c)

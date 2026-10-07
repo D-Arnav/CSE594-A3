@@ -127,7 +127,7 @@ def fake_repo(tmp_path, monkeypatch):
     data = tmp_path / "data"
     raw = data / "raw"
     for name, val in {"ROOT": tmp_path, "DATA": data, "RAW": raw, "IMG_DIR": raw / "images",
-                      "INDEX_CSV": raw / "test_index.csv", "OCR_CACHE": raw / "ocr_cache.csv",
+                      "INDEX_CSV": raw / "test_index.csv", "CLIP_CACHE": raw / "clip_cache.csv", "OCR_CACHE": raw / "ocr_cache.csv",
                       "LOG_FILE": data / "build_log.txt"}.items():
         monkeypatch.setattr(bd, name, val)
     rng = np.random.default_rng(0)
@@ -136,10 +136,10 @@ def fake_repo(tmp_path, monkeypatch):
         for i in range(40):
             rows.append((f"{iso}{i:03d}", lat0 + rng.uniform(-3, 3), 100 + rng.uniform(-3, 3), iso))
     meta = pd.DataFrame(rows, columns=["id", "latitude", "longitude", "country"])
-    monkeypatch.setattr(bd, "load_meta", lambda repo: meta)
-    monkeypatch.setattr(bd, "build_index", lambda repo: pd.DataFrame({"id": meta["id"], "zip": "00.zip", "member": ""}))
+    monkeypatch.setattr(bd, "load_meta", lambda *a, **k: meta)
+    monkeypatch.setattr(bd, "build_index", lambda *a, **k: pd.DataFrame({"id": meta["id"], "zip": "00.zip", "member": ""}))
 
-    def fake_download(ids, index, repo, img_dir=None):
+    def fake_download(ids, index, repo, img_dir=None, split=None):
         bd.IMG_DIR.mkdir(parents=True, exist_ok=True)
         for k, i in enumerate(sorted(ids)):
             noise_image(k, (300, 200 if i.endswith("7") else 300)).save(bd.IMG_DIR / f"{i}.jpg")
@@ -149,7 +149,7 @@ def fake_repo(tmp_path, monkeypatch):
         j[0]: [("SIGN TEXT", 0.9)] if int(j[0][2:]) % 3 == 0 else [] for j in jobs})
     cfg = bd.load_config()
     cfg["data"].update(countries=["Chile", "Japan", "South Korea"], backup_countries=[], min_candidates=30,
-                       per_country_study=4, per_country_dev=4, text_ratio=0.5)
+                       per_country_study=4, per_country_dev=4, text_ratio=0.5, cities=None, clip_prompts=None)
     return cfg, data
 
 
@@ -208,3 +208,27 @@ def test_coord_overlay_regex():
     assert bd.COORD_RE.search("114km/h N49.6952 Е40.5379 | AdvoCam")
     assert bd.COORD_RE.search("n12 52.7158")
     assert not bd.COORD_RE.search("2016/11/04 08.39.51 | Main St 12.5")
+
+
+def test_near_city():
+    m = bd.near_city([35.68, 35.68, 34.0], [139.69, 139.80, 139.69], [[35.68, 139.69]], 15)
+    assert m.tolist() == [True, True, False]
+    assert bd.near_city([1.0], [2.0], [], 15).tolist() == [True]
+
+
+def test_build_urban_filter_and_clip_ranking(fake_repo, monkeypatch):
+    cfg, data = fake_repo
+    # Japan candidates sit around lat 35, lon 100: a center there keeps them, Chile has no centers
+    cfg["data"].update(text_ratio=None, cities={"Japan": [[35.0, 100.0]]}, city_radius_km=1000,
+                       clip_prompts=["city", "road"])
+    scores = {}
+    monkeypatch.setattr(bd, "clip_scores", lambda paths, prompts, model: scores.update(
+        {i: int(i[2:]) / 100 for i in paths}) or {i: int(i[2:]) / 100 for i in paths})
+    bd.build(cfg, pool=20)
+    s1 = pd.read_csv(data / "study" / "study_meta.csv", dtype={"source_id": str})
+    d1 = pd.read_csv(data / "dev" / "dev_meta.csv", dtype={"source_id": str})
+    log = (data / "build_log.txt").read_text()
+    assert "URBAN Japan" in log and "URBAN Chile" not in log and "CLIP Japan: kept 8" in log
+    jp = set(s1.source_id[s1.country == "Japan"]) | set(d1.source_id[d1.country == "Japan"])
+    pool_jp = [i for i in scores if i.startswith("JP")]
+    assert jp == set(sorted(pool_jp, key=lambda i: -scores[i])[:8])  # the 8 best CLIP scores

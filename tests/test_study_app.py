@@ -1,19 +1,14 @@
 import json
 import sqlite3
-import sys
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
 
 import pandas as pd
 import pytest
+from fastapi.testclient import TestClient
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "study_app"))
-import app  # noqa: E402
-from assignments import HUMAN, HUMAN_AI  # noqa: E402
-from common import CLUSTER_OF, countries, load_config  # noqa: E402
+from common import CLUSTER_OF, countries, load_config
+from study_app import server
+from study_app.assignments import HUMAN, HUMAN_AI
 
 ACTIVE = countries(load_config())
 
@@ -23,155 +18,137 @@ def fake_row(i, prefix, tmp_path):
     top = [ACTIVE[(i + k) % len(ACTIVE)] for k in ((1, 0, 2) if i % 2 else (0, 1, 2))]
     img = tmp_path / f"{prefix}{i:03d}.jpg"
     Image.new("RGB", (64, 48), (i * 10 % 255, 100, 150)).save(img)
-    row = {"trial_id": f"{prefix}{i:03d}", "image_path": str(img), "source_id": str(i), "country": truth,
-           "cluster": CLUSTER_OF[truth], "has_text": False, "ai_correct_top1": top[0] == truth}
+    row = {"trial_id": f"{prefix}{i:03d}", "image_path": str(img), "country": truth, "cluster": CLUSTER_OF[truth],
+           "ai_correct_top1": top[0] == truth}
     for k, c in enumerate(top, 1):
         row |= {f"ai_top{k}": c, f"ai_p{k}": [0.5, 0.3, 0.1][k - 1], f"ai_rationale{k}": f"RATIONALE-{i}-{k}"}
     return row
 
 
 @pytest.fixture
-def data(tmp_path, monkeypatch):
-    study = pd.DataFrame([fake_row(i, "S", tmp_path) for i in range(1, 17)])
+def env(tmp_path, monkeypatch):
+    study = pd.DataFrame([fake_row(i, "S", tmp_path) for i in range(1, 17)])  # 2 sets of 8
     dev = pd.DataFrame([fake_row(i, "D", tmp_path) for i in range(1, 4)])
     study.to_csv(tmp_path / "study.csv", index=False)
     dev.to_csv(tmp_path / "dev.csv", index=False)
     monkeypatch.setenv("GEOHAI_STUDY_CSV", str(tmp_path / "study.csv"))
     monkeypatch.setenv("GEOHAI_PRACTICE_CSV", str(tmp_path / "dev.csv"))
     monkeypatch.setenv("GEOHAI_DB", str(tmp_path / "r.db"))
-    return tmp_path, study.set_index("trial_id", drop=False).to_dict("index")
+    rows = {r["trial_id"]: r for r in pd.concat([study, dev]).to_dict("records")}
+    return TestClient(server.app), rows, tmp_path / "r.db"
 
 
-def test_log_roundtrip(tmp_path):
-    db = tmp_path / "r.db"
-    row = {"participant_id": 3, "session_id": "abc", "block": "A", "condition": HUMAN_AI, "trial_order": 2,
-           "trial_id": "S001", "response": "Chile", "correct": 1, "chose_rank": 0, "ai_top1_correct": 0,
-           "rt_ms": 1234, "expanded_other": 1, "timestamp": app.now(), "is_practice": 0, "ai_source": "cache"}
-    app.log_row(db, "responses", row)
-    app.log_row(db, "surveys", {"participant_id": 3, "session_id": "abc", "trust": 5, "usefulness": 6,
-                                "geo_knowledge": 2, "free_text": "hi", "timestamp": app.now()})
-    got = app.read_table(db, "responses")
-    assert got.to_dict("records") == [row]
-    assert app.read_table(db, "surveys").loc[0, "trust"] == 5
+def answer(t, rows, right=True):
+    """A valid response body: human-AI picks card 1 (or the 'Other' row), human-only picks a country."""
+    truth = rows[t["trial_id"]]["country"]
+    resp = truth if right else next(c for c in ACTIVE if c != truth)
+    body = {"trial_order": t["trial_order"], "trial_id": t["trial_id"], "response": resp, "rt_ms": 1500}
+    if t["condition"] == HUMAN_AI:
+        rank = next((a["rank"] for a in t["ai"] if a["country"] == resp), 0)
+        body |= {"chose_rank": rank, "expanded_other": rank == 0}
+    return body
 
 
-def test_register_participant_autoincrements(tmp_path):
-    db = tmp_path / "r.db"
-    assert app.register_participant(db, "a") == 0
-    assert app.register_participant(db, "b") == 1
-    assert app.register_participant(db, "c", pid=7) == 7
-    assert app.register_participant(db, "d") == 8
+def test_session_create_autoincrement_and_resume(env):
+    c, rows, _ = env
+    s0 = c.post("/api/session", json={}).json()
+    s1 = c.post("/api/session", json={}).json()
+    assert (s0["pid"], s1["pid"]) == (0, 1) and s0["session_id"] != s1["session_id"]
+    assert c.post("/api/session", json={"pid": 7}).json()["pid"] == 7
+    assert c.post("/api/session", json={}).json()["pid"] == 8
+    again = c.post("/api/session", json={"pid": 0}).json()  # existing pid -> same session, no new row
+    assert again["session_id"] == s0["session_id"]
+    assert c.get("/api/session", params={"pid": 3}).status_code == 404
+    seq = s0["trials"]
+    assert [t["block"] for t in seq] == ["practice"] * 2 + ["A"] * 8 + ["B"] * 8
+    assert [t["condition"] for t in seq[2:]] == [HUMAN] * 8 + [HUMAN_AI] * 8  # even pid: human-only first
+    assert s1["trials"][2]["condition"] == HUMAN_AI
+    assert s0["countries"] == ACTIVE
+
+    c.post("/api/response", json={"pid": 0, **answer(seq[0], rows)})
+    resumed = c.get("/api/session", params={"pid": 0}).json()
+    assert resumed["done"] == 1 and not resumed["survey_done"]
 
 
-def test_human_only_view_has_no_ai_fields(data):
-    _, rows = data
-    row = rows["S003"]
-    view = app.trial_view(row, HUMAN, live_url="http://127.0.0.1:9")
-    assert set(view) == {"trial_id", "image_path", "condition"}
-    text = json.dumps(view)
-    assert "RATIONALE" not in text and row["country"] not in text
-    ai = app.trial_view(row, HUMAN_AI)
-    assert [c["rank"] for c in ai["ai"]] == [1, 2, 3] and ai["ai"][0]["country"] == row["ai_top1"]
-    assert ai["ai_source"] == "cache"
+def test_payload_never_leaks_truth_and_human_only_has_no_ai(env):
+    c, rows, _ = env
+    s = c.post("/api/session", json={}).json()
+    for t in s["trials"]:
+        row = rows[t["trial_id"]]
+        assert "country" not in t and "correct" not in json.dumps(t)
+        if t["condition"] == HUMAN:
+            assert set(t) == {"trial_order", "block", "condition", "is_practice", "trial_id", "image"}
+        else:
+            assert [a["country"] for a in t["ai"]] == [row["ai_top1"], row["ai_top2"], row["ai_top3"]]
+            assert t["ai"][0]["rationale"] == row["ai_rationale1"]
+    human = [t for t in s["trials"] if t["condition"] == HUMAN]
+    assert "RATIONALE" not in json.dumps(human)
+    img = c.get(s["trials"][0]["image"])
+    assert img.status_code == 200 and img.headers["content-type"] == "image/jpeg"
+    assert c.get("/img/nope").status_code == 404
 
 
-def test_live_mode_and_fallback(data):
-    _, rows = data
-
-    class H(BaseHTTPRequestHandler):
-        def do_POST(self):
-            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            out = {"trial_id": body["trial_id"], "top3": [{"country": c, "p": 0.2, "rationale": "live"}
-                                                          for c in ("Japan", "Chile", "Italy")]}
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(json.dumps(out).encode())
-
-        def log_message(self, *a):
-            pass
-
-    srv = HTTPServer(("127.0.0.1", 0), H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    try:
-        view = app.trial_view(rows["S001"], HUMAN_AI, f"http://127.0.0.1:{srv.server_port}")
-    finally:
-        srv.shutdown()
-    assert view["ai_source"] == "live" and view["ai"][0] == {"rank": 1, "country": "Japan", "p": 0.2,
-                                                              "rationale": "live"}
-    view = app.trial_view(rows["S001"], HUMAN_AI, "http://127.0.0.1:9")  # nothing listening
-    assert view["ai_source"] == "cache" and view["ai"][0]["country"] == rows["S001"]["ai_top1"]
+def test_response_validation(env):
+    c, rows, _ = env
+    seq = c.post("/api/session", json={}).json()["trials"]  # pid 0: practice human, practice AI, ...
+    t0, t1 = seq[0], seq[1]
+    ok = {"pid": 0, **answer(t0, rows)}
+    assert c.post("/api/response", json={**ok, "pid": 5}).status_code == 404
+    assert c.post("/api/response", json={**ok, "trial_id": t1["trial_id"]}).status_code == 422
+    assert c.post("/api/response", json={**ok, "response": "Atlantis"}).status_code == 422
+    assert c.post("/api/response", json={**ok, "chose_rank": 1}).status_code == 422  # human-only
+    assert c.post("/api/response", json={**ok, "trial_order": 1}).status_code == 409  # out of order
+    assert c.post("/api/response", json={**ok, "rt_ms": -1}).status_code == 422
+    assert c.post("/api/response", json=ok).status_code == 200
+    assert c.post("/api/response", json=ok).status_code == 409  # double submit
+    ai = {"pid": 0, **answer(t1, rows)}
+    wrong_card = {**ai, "chose_rank": 2, "response": t1["ai"][0]["country"], "expanded_other": False}
+    assert c.post("/api/response", json=wrong_card).status_code == 422
+    assert c.post("/api/response", json={**ai, "chose_rank": 0, "expanded_other": False}).status_code == 422
+    assert c.post("/api/response", json={**ai, "chose_rank": None}).status_code == 422
+    assert c.post("/api/survey", json={"pid": 0, "trust": 4, "usefulness": 4, "geo_knowledge": 4}).status_code == 409
 
 
-def test_response_row(data):
-    _, rows = data
-    row = rows["S002"]  # even i -> AI top-1 correct
-    trial = {"block": "B", "condition": HUMAN_AI, "trial_order": 9, "trial_id": "S002", "is_practice": False}
-    view = app.trial_view(row, HUMAN_AI)
-    r = app.response_row(trial, view, row, row["country"], 1, False, 500, 4, "s")
-    assert (r["correct"], r["chose_rank"], r["ai_top1_correct"], r["is_practice"]) == (1, 1, 1, 0)
-    assert list(r) == app.COLS["responses"]
+def test_correctness_is_computed_server_side(env):
+    c, rows, db = env
+    seq = c.post("/api/session", json={}).json()["trials"]
+    for t, right in zip(seq[:4], [True, False, False, True]):
+        body = answer(t, rows, right) | {"correct": int(not right)}  # client-sent fields are ignored
+        assert c.post("/api/response", json={"pid": 0, **body}).status_code == 200
+    with sqlite3.connect(db) as conn:
+        got = conn.execute("SELECT trial_id, correct, ai_top1_correct, is_practice FROM responses").fetchall()
+    assert [g[1] for g in got] == [1, 0, 0, 1]
+    assert [g[2] for g in got] == [int(rows[g[0]]["ai_top1"] == rows[g[0]]["country"]) for g in got]
+    assert [g[3] for g in got] == [1, 1, 0, 0]
 
 
-def page_text(at):
-    return " ".join(str(e.value) for kind in ("markdown", "info", "caption", "subheader", "title")
-                    for e in getattr(at, kind))
-
-
-def answer(at):
-    """Pick the first available option on the current trial and submit it."""
-    cards = [b for b in at.button if "_c_" in (b.key or "")]
-    if cards:
-        cards[0].click().run()
-    else:
-        next(b for b in at.button if "_g_" in (b.key or "")).click().run()
-    next(b for b in at.button if (b.key or "").endswith("_submit")).click().run()
-
-
-def test_app_full_flow(data):
-    from streamlit.testing.v1 import AppTest
-    tmp_path, rows = data
-    at = AppTest.from_file(str(ROOT / "study_app" / "app.py"), default_timeout=30)
-    at.query_params["pid"] = "0"
-    at.run()
-    assert not at.exception
-    assert at.title[0].value == "Where was this photo taken?"
-    at.checkbox[0].check().run()
-    next(b for b in at.button if b.label == "Start").click().run()
-
-    # pid 0 -> practice human-only first: no AI information anywhere on the page
-    assert "Practice" in at.subheader[0].value
-    text = page_text(at)
-    assert app.BANNER not in text and "RATIONALE" not in text and "confidence" not in text
-    assert not [b for b in at.button if "None of these" in b.label]
-    answer(at)
-
-    # practice human-AI: banner + three cards
-    assert app.BANNER in page_text(at)
-    assert len([b for b in at.button if "_c_" in (b.key or "")]) == 3
-    # "None of these" expands the 20-country grid; a grid pick logs chose_rank 0
-    assert not [b for b in at.button if "_g_" in (b.key or "")]
-    next(b for b in at.button if "None of these" in b.label).click().run()
-    grid = [b for b in at.button if "_g_" in (b.key or "")]
-    assert sorted(b.label for b in grid) == sorted(ACTIVE)
-    grid[0].click().run()
-    next(b for b in at.button if (b.key or "").endswith("_submit")).click().run()
-    for _ in range(16):
-        assert not at.exception
-        answer(at)
-
-    assert "questions" in at.subheader[0].value
-    for r in at.radio:
-        r.set_value(4)
-    at.text_area[0].input("fun")
-    at.button[0].click().run()
-    assert at.success
-
-    resp = app.read_table(tmp_path / "r.db", "responses")
-    assert len(resp) == 18 and resp.is_practice.sum() == 2
-    assert list(resp.block) == ["practice"] * 2 + ["A"] * 8 + ["B"] * 8
-    assert set(resp[resp.block == "A"].condition) == {HUMAN} and set(resp[resp.block == "B"].condition) == {HUMAN_AI}
-    assert resp.participant_id.eq(0).all() and resp.rt_ms.ge(0).all()
+def test_full_flow_and_survey(env):
+    c, rows, db = env
+    s = c.post("/api/session", json={}).json()
+    for i, t in enumerate(s["trials"]):
+        assert c.post("/api/response", json={"pid": s["pid"], **answer(t, rows, right=i % 3 == 0)}).status_code == 200
+    bad = {"pid": 0, "trust": 8, "usefulness": 5, "geo_knowledge": 2}
+    assert c.post("/api/survey", json=bad).status_code == 422
+    survey = {"pid": 0, "trust": 5, "usefulness": 6, "geo_knowledge": 2, "free_text": "hi"}
+    assert c.post("/api/survey", json=survey).status_code == 200
+    assert c.post("/api/survey", json=survey).status_code == 409
+    st = c.get("/api/session", params={"pid": 0}).json()
+    assert st["done"] == 18 and st["survey_done"]
+    with sqlite3.connect(db) as conn:
+        resp = pd.read_sql("SELECT * FROM responses", conn)
+        surveys = pd.read_sql("SELECT * FROM surveys", conn)
+    assert len(resp) == 18 and resp["is_practice"].sum() == 2
+    assert list(resp["trial_order"]) == list(range(18))
+    assert set(resp.columns) == set(server.RESPONSE_COLS)
     ai = resp[resp.condition == HUMAN_AI]
-    assert list(ai.chose_rank) == [0] + [1] * 8 and list(ai.expanded_other) == [1] + [0] * 8
-    with sqlite3.connect(tmp_path / "r.db") as conn:
-        assert conn.execute("SELECT trust, free_text FROM surveys").fetchall() == [(4, "fun")]
+    assert ai["chose_rank"].notna().all() and resp[resp.condition == HUMAN]["chose_rank"].isna().all()
+    assert surveys.to_dict("records")[0] | {"timestamp": None} == {
+        "participant_id": 0, "session_id": s["session_id"], "trust": 5, "usefulness": 6, "geo_knowledge": 2,
+        "free_text": "hi", "timestamp": None}
+
+
+def test_static_page_served(env):
+    c, _, _ = env
+    page = c.get("/")
+    assert page.status_code == 200 and "None of these — choose another" in page.text
+    assert "The AI can be wrong and sometimes describes things that aren't in the image. Check its evidence." in page.text

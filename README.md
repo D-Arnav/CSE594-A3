@@ -42,7 +42,8 @@ src/
   server.py                # FastAPI live inference: /health, /predict (SPEC 10)
   finetune_lora.py         # optional LoRA bonus path (SPEC 5.6)
 study_app/
-  app.py                   # Assignment 3 Streamlit study interface (SPEC 11)
+  server.py                # Assignment 3 study backend (FastAPI, SPEC 11)
+  static/index.html        # the study page (plain HTML + JS)
   assignments.py           # counterbalanced trial allocation
 notebooks/colab_run.ipynb  # the whole pipeline on a Colab T4
 tests/                     # pytest suite
@@ -190,14 +191,20 @@ record in the `raw_outputs.jsonl` format. Take the "model running" screenshot (S
 `outputs/dev/dev_dataset.csv` for the practice trials):
 
 ```bash
-streamlit run study_app/app.py
+uvicorn study_app.server:app --port 8501      # then open http://localhost:8501
 ```
 
-- URL parameters: `?pid=N` fixes the participant ID. On Streamlit Cloud the DB is wiped on restart, so give each
-  participant an explicit `?pid=N` link (0,1,2,...); auto-numbering is only safe locally. `?live=1` fetches the AI
-  outputs from the server at `$GEOHAI_SERVER_URL` and falls back to the cache.
-- Responses are logged to `study_app/responses.db` (SQLite). Override with `$GEOHAI_DB`.
-- Mirroring to Google Sheets is optional and is set up through `st.secrets` (see the docstring of `study_app/app.py`).
+- A single HTML page (`study_app/static/index.html`, vanilla JS) served by a small FastAPI backend
+  (`study_app/server.py`). Each trial fits in one screen: the photo on the left, the choices on the right, keys 1–5
+  to pick and Enter for Next. Human-only trials never receive AI fields, and no trial receives the true country;
+  correctness is computed on the server.
+- `?pid=N` fixes the participant ID; without it, the next free ID is assigned at consent. A refresh resumes at the
+  right trial.
+- Responses go to `study_app/responses.db` (SQLite; override with `$GEOHAI_DB`), in the tables `responses`
+  (SPEC 11.4 + `is_practice`), `surveys` and `participants`. Back the file up, since it is the only copy.
+- Hosting: run it on your machine and share it with `cloudflared tunnel --url http://localhost:8501`. Restart the
+  server after regenerating `outputs/study_dataset.csv`, because the CSVs are loaded once.
+- Screenshots are in `docs/screenshots/ui_*.png`.
 
 **Optional: LoRA** (SPEC 5.6):
 

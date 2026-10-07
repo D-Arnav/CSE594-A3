@@ -295,7 +295,8 @@ def _cluster_spans(labels):
 
 
 def plot_confusion(cm, labels, path):
-    fig, ax = plt.subplots(figsize=(11, 10))
+    side = 3 + 0.45 * len(labels)  # 20 labels -> 12 in, 5 -> ~5 in
+    fig, ax = plt.subplots(figsize=(side + 1, side))
     im = ax.imshow(cm, cmap="Blues")
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="# trials")
     for i in range(len(labels)):
@@ -319,7 +320,7 @@ def plot_confusion(cm, labels, path):
 
 
 def plot_per_country(per_country, labels, overall, chance, path):
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=(max(6, 0.6 * len(labels)), 5))
     acc = [per_country.get(c, {}).get("top1", 0.0) for c in labels]
     ax.bar(labels, acc, color=[CLUSTER_COLOR.get(CLUSTER_OF.get(c), "#999999") for c in labels],
            edgecolor="black")

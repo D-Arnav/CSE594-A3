@@ -18,7 +18,7 @@ class FakeGM:
         pass
 
     def score_candidates(self, image, prompt, candidates, naive=False, answer_format="{c}"):
-        favored = "Canada" if image.getpixel((0, 0))[0] > 100 else "Japan"
+        favored = "Germany" if image.getpixel((0, 0))[0] > 100 else "Japan"
         return {c: (0.0 if c == favored else -2.0 - 0.1 * i) for i, c in enumerate(candidates)}, \
             {c: 2 for c in candidates}
 
@@ -39,8 +39,8 @@ def setup(tmp_path, monkeypatch):
         d = tmp_path / split
         d.mkdir()
         (d / f"{tid}.jpg").write_bytes(jpeg(color))
-        (d / f"{split}_meta.csv").write_text(f"trial_id,image_path,country\n{tid},{d / f'{tid}.jpg'},Canada\n"
-                                             f"{tid[0]}999,{d / 'missing.jpg'},Canada\n")
+        (d / f"{split}_meta.csv").write_text(f"trial_id,image_path,country\n{tid},{d / f'{tid}.jpg'},Germany\n"
+                                             f"{tid[0]}999,{d / 'missing.jpg'},Germany\n")
     cfg = load_config()
     cfg["server"] = {"max_upload_mb": 0.01}
     app = server.create_app(cfg, model_factory=FakeGM, data_dir=tmp_path)
@@ -62,8 +62,8 @@ def test_predict_trial_id_record_shape(setup):
     assert rec["trial_id"] == "S001" and rec["model_id"] == "fake-m"
     assert rec["candidate_order"] == candidate_order(labels, cfg["seed"], "S001")
     assert set(rec["logprobs"]) == set(labels) and set(rec["n_answer_tokens"]) == set(labels)
-    assert [t["country"] for t in rec["top3"]][0] == "Canada"
-    assert rec["top3"][0]["rationale"] == "Clue for Canada."
+    assert [t["country"] for t in rec["top3"]][0] == "Germany"
+    assert rec["top3"][0]["rationale"] == "Clue for Germany."
     assert rec["temperature"] == cfg["inference"]["temperature"] and rec["temperature_source"] == "config"
     assert abs(sum(rec["probs"].values()) - 1) < 1e-3
     for k in ["prompt_versions", "max_pixels", "seed", "runtime_s"]:
@@ -77,7 +77,7 @@ def test_predict_upload_matches_hash_key(setup):
     rec = client.post("/predict", files={"image": ("x.jpg", data, "image/jpeg")}).json()
     assert rec["trial_id"] == "upload"
     assert rec["candidate_order"] == candidate_order(countries(cfg), cfg["seed"], image_key(data))
-    assert rec["top3"][0]["country"] == "Canada"
+    assert rec["top3"][0]["country"] == "Germany"
 
 
 @pytest.mark.parametrize("kwargs, code", [
