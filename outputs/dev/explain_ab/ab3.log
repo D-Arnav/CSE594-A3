@@ -1,0 +1,43 @@
+Loading weights:   0%|          | 0/625 [00:00<?, ?it/s]Loading weights:   0%|          | 1/625 [00:01<13:19,  1.28s/it]Loading weights:  31%|███       | 191/625 [00:01<00:02, 190.41it/s]Loading weights:  48%|████▊     | 299/625 [00:02<00:02, 142.79it/s]Loading weights:  58%|█████▊    | 363/625 [00:02<00:01, 171.22it/s]Loading weights:  68%|██████▊   | 424/625 [00:02<00:00, 210.74it/s]Loading weights:  77%|███████▋  | 484/625 [00:02<00:00, 256.18it/s]Loading weights:  87%|████████▋ | 546/625 [00:02<00:00, 303.79it/s]Loading weights:  96%|█████████▋| 602/625 [00:03<00:00, 268.15it/s]Loading weights: 100%|██████████| 625/625 [00:03<00:00, 191.56it/s]
+D001
+D002
+D003
+D004
+D005
+D006
+D007
+D008
+D009
+D010
+D011
+D012
+D013
+D014
+D015
+D016
+D017
+D018
+D019
+D020
+D021
+D022
+D023
+D024
+D025
+D026
+D027
+D028
+D029
+D030
+D031
+D032
+D033
+D034
+D035
+D036
+D037
+D038
+D039
+D040
+v1 no-clues by rank: [0.42, 0.9, 1.0] yes/no opener: 0.98 mean chars: 57
+v3 no-clues by rank: [0.0, 0.0, 0.0] yes/no opener: 0.0 mean chars: 191

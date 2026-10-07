@@ -216,7 +216,9 @@ python src/finetune_lora.py train --config config.yaml --epochs 1 --out outputs/
 - **CPU:** this falls back to float32 and is slow. Use it only for `evaluate.py`, `annotate.py` and the study app,
   which never load the model.
 - If scoring raises `non-finite logprobs`, set `model.dtype` to `bfloat16` (not on a T4) or `float32`.
-- Measured runtime: _[TODO: s/trial on T4]_ and _[TODO: s/trial on MPS]_, about _[TODO]_ min for 200 trials. The
+- Measured runtime on Apple Silicon (MPS, fp16): about 1.1 s/trial for scoring and 9.4 s/trial for three v2
+  rationales, so about 35 min for 200 trials (not yet measured on a T4). Keep the machine awake (`caffeinate -i` on
+  macOS); a sleeping laptop stalls the run, and `predict.py` resumes from the jsonl. The
   SPEC estimates are 15–30 min for scoring and 10–20 min for rationales on a T4. `predict.py` prints the measured
   `runtime_s`/`score_s`/`explain_s` means.
 
@@ -227,7 +229,7 @@ python src/finetune_lora.py train --config config.yaml --epochs 1 --out outputs/
 | `data/{split}/{split}_meta.csv` | `trial_id, image_path, source_id, country, cluster, lat, lon, has_text, ocr_text, script, split` |
 | `data/build_log.txt` | dataset build log: candidate pools, filter counts, text counts, substitutions, shortfalls |
 | `outputs/{,dev/}raw_outputs.jsonl` | one record per trial (SPEC 5.5): model/revision/prompt versions, temperature, candidate order, logprobs, probs, `n_answer_tokens`, top-3 with rationales, `max_pixels`, `seed`, runtimes |
-| `outputs/study_dataset.csv` | **the submitted dataset** (SPEC 6 columns + `temperature`, `max_pixels`); `prompt_version` looks like `rank=v1;explain=v1` |
+| `outputs/study_dataset.csv` | **the submitted dataset** (SPEC 6 columns + `temperature`, `max_pixels`); `prompt_version` looks like `rank=v1;explain=v2` |
 | `outputs/dev/dev_dataset.csv` | the same thing for dev (also the source of the study app's practice trials) |
 | `outputs/temperature.json` | `T` fitted on dev with NLL before and after; used by `predict.py` and `server.py` when present |
 | `outputs/dev/baseline_json{.jsonl,_summary.json}` | JSON baseline outputs and summary (SPEC 5.4) |
@@ -237,16 +239,20 @@ python src/finetune_lora.py train --config config.yaml --epochs 1 --out outputs/
 
 ## Results
 
-Placeholders. Fill these in from `outputs/report/metrics.json` once the study run is final.
+From `outputs/report/` (study) and `outputs/dev/report/` (dev). Ranking: rank prompt v1, summed log p; confidences
+use T = 2.87 fitted on dev; rationales use explain v2 (`docs/iteration_log.md`).
 
-| Metric (study, n=200) | Value | 95% CI |
-|---|---|---|
-| Top-1 accuracy | _[TODO]_ | _[TODO]_ |
-| Top-3 accuracy | _[TODO]_ | _[TODO]_ |
-| MRR | _[TODO]_ | _[TODO]_ |
-| ECE (10 bins) | _[TODO]_ | — |
-| Human-catchable share of top-1 errors | _[TODO]_ | — |
-| Fitted T (dev) | _[TODO]_ | — |
+| Metric | Study (n=200) | 95% CI | Dev (n=200) |
+|---|---|---|---|
+| Top-1 accuracy | 59.0% | 52.0–65.5 | 60.5% |
+| Top-3 accuracy | 81.0% | 75.0–86.0 | 79.5% |
+| MRR | 0.720 | 0.668–0.767 | 0.724 |
+| ECE (10 bins) | 0.052 | — | 0.082 |
+| Human-catchable share of top-1 errors | _[TODO: after annotation]_ | — | — |
+| Fitted T (dev) | 2.87 | — | — |
+
+Live service: `/predict` for `S017` returns the same top-3 and probabilities as the cached CSV
+(`docs/screenshots/predict_S017.json`), and `tests/test_server.py -m model` checks parity on 5 study images.
 
 ## Tests
 
