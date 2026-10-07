@@ -113,6 +113,44 @@ too often empty to support verification in the human-AI condition. Per SPEC 9 th
 
 ---
 
+## 3. Five countries, urban images, new study UI — 2026-10-06
+
+- **Changed:**
+  - Label space reduced from 20 to 5 well-separated countries: United States, Germany, Japan, South Korea, India.
+    Japan and South Korea stay as one confusable pair. There are now 40 study + 40 dev images per country (still
+    200 + 200).
+  - Images now come from the OSV-5M **train** split (`data.source_split: train`). They are restricted to within
+    15 km of about 10 major city centers per country (`data.cities`), with same-street repeats removed
+    (`min_distance_km: 1`). Of 300 candidates per country, the 80 with the highest CLIP
+    (`openai/clip-vit-base-patch32`) probability for "a busy city street with buildings, shops and signs" over "an
+    empty road through the countryside" are kept, then shuffled into study and dev.
+  - The study app is rebuilt as a single HTML page with a FastAPI backend (`study_app/server.py`). Each trial fits
+    in one screen and has 5 country buttons.
+- **Why:** user feedback after trying the app. The rural dashcam images did not show their region clearly, 20
+  options were too many, and the Streamlit layout needed scrolling.
+- **Deviations from SPEC:**
+  - 4.2: 5 countries, not 20.
+  - 4.1/4.4: study and dev come from the train split. The test split has almost no city images, e.g. only 5 US
+    and 8 Japan images within 10 km of a major city center. The SPEC reserved the train split for fine-tuning
+    to avoid leakage, and LoRA is not used. If it were, `finetune_lora.py` still excludes train images within
+    5 km of any study/dev image.
+  - 4.3 step 3: 1 km spacing instead of 25 km, since the images are deliberately urban.
+  - 11: plain HTML/FastAPI instead of Streamlit, SQLite only.
+- **Dataset build** (`data/build_log.txt`):
+  - Urban candidates per country: US 23,433, Germany 22,150, Japan 17,712, South Korea 1,554, India 9,754.
+  - South Korea's urban pool is small: 117 of its 300 candidates lie within 1 km of another.
+  - CLIP cut-off of the kept 80: India 0.94, South Korea 0.82, Japan 0.66, US 0.60, Germany 0.07. Germany's
+    candidates look least like "busy streets" (wide residential roads, some airport and park shots).
+  - OCR flags text in 41 of 400 images, mostly South Korea (24 of 80 candidates).
+- **Dev / study metrics:** see below once inference finishes.
+- **Expected effect:** with 5 clear options, AI top-1 is likely to exceed the SPEC 0.3 band (45–75%). That weakens
+  the "don't delegate" argument, and the top-3 cards cover 3 of the 5 countries. This is a deliberate trade-off
+  for a clearer task, and it is discussed in the report.
+- The JSON baseline and the explain A/B in entries 1–2 were run on the 20-country dev set. Their outputs are in
+  `outputs/archive_20country/`.
+
+---
+
 ## JSON generative baseline (SPEC 5.4)
 
 ```bash

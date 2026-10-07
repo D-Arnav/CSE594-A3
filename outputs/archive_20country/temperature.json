@@ -1,0 +1,9 @@
+{
+  "T": 2.868919225073546,
+  "nll_before": 2.324276819295927,
+  "nll_after": 1.4352470678108227,
+  "n": 200,
+  "split": "dev",
+  "model_id": "Qwen/Qwen3-VL-2B-Instruct",
+  "revision": "89644892e4d85e24eaac8bacfd4f463576704203"
+}

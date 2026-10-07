@@ -1,0 +1,291 @@
+{
+  "pred": "outputs/dev/dev_dataset.csv",
+  "n": 200,
+  "seed": 42,
+  "bootstrap": 1000,
+  "chance": 0.05,
+  "n_labels": 20,
+  "ece_bins": 10,
+  "model_id": "Qwen/Qwen3-VL-2B-Instruct",
+  "revision": "89644892e4d85e24eaac8bacfd4f463576704203",
+  "top1": {
+    "value": 0.605,
+    "ci": [
+      0.54,
+      0.675
+    ]
+  },
+  "top3": {
+    "value": 0.795,
+    "ci": [
+      0.74,
+      0.85
+    ]
+  },
+  "mrr": {
+    "value": 0.7236618001022026,
+    "ci": [
+      0.6777893649114044,
+      0.7716699774640564
+    ]
+  },
+  "partial_credit": {
+    "value": 0.76,
+    "ci": [
+      0.6998749999999999,
+      0.82
+    ]
+  },
+  "ece": 0.08050000000000004,
+  "reliability_bins": [
+    {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 0,
+      "acc": null,
+      "conf": null
+    },
+    {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 25,
+      "acc": 0.2,
+      "conf": 0.15200000000000002
+    },
+    {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 23,
+      "acc": 0.43478260869565216,
+      "conf": 0.23869565217391306
+    },
+    {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 20,
+      "acc": 0.4,
+      "conf": 0.33499999999999996
+    },
+    {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 17,
+      "acc": 0.5882352941176471,
+      "conf": 0.44352941176470584
+    },
+    {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 17,
+      "acc": 0.5294117647058824,
+      "conf": 0.5417647058823529
+    },
+    {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 13,
+      "acc": 0.5384615384615384,
+      "conf": 0.6330769230769231
+    },
+    {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 12,
+      "acc": 0.6666666666666666,
+      "conf": 0.7450000000000001
+    },
+    {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 23,
+      "acc": 0.8695652173913043,
+      "conf": 0.8569565217391303
+    },
+    {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 50,
+      "acc": 0.88,
+      "conf": 0.9592
+    }
+  ],
+  "terciles": [
+    {
+      "tercile": "low",
+      "n": 65,
+      "p1_min": 0.11,
+      "p1_max": 0.35,
+      "mean_p1": 0.22876923076923075,
+      "acc": 0.35384615384615387
+    },
+    {
+      "tercile": "mid",
+      "n": 66,
+      "p1_min": 0.37,
+      "p1_max": 0.82,
+      "mean_p1": 0.5803030303030302,
+      "acc": 0.5757575757575758
+    },
+    {
+      "tercile": "high",
+      "n": 69,
+      "p1_min": 0.83,
+      "p1_max": 0.99,
+      "mean_p1": 0.9334782608695652,
+      "acc": 0.8695652173913043
+    }
+  ],
+  "by_has_text": {
+    "False": {
+      "n": 195,
+      "top1": 0.6,
+      "top3": 0.7948717948717948
+    },
+    "True": {
+      "n": 5,
+      "top1": 0.8,
+      "top3": 0.8
+    }
+  },
+  "per_country": {
+    "United States": {
+      "n": 10,
+      "top1": 0.4,
+      "top3": 0.8
+    },
+    "Canada": {
+      "n": 10,
+      "top1": 0.5,
+      "top3": 0.8
+    },
+    "Mexico": {
+      "n": 10,
+      "top1": 0.6,
+      "top3": 0.8
+    },
+    "Brazil": {
+      "n": 10,
+      "top1": 0.7,
+      "top3": 1.0
+    },
+    "Argentina": {
+      "n": 10,
+      "top1": 0.2,
+      "top3": 0.5
+    },
+    "Chile": {
+      "n": 10,
+      "top1": 0.6,
+      "top3": 0.8
+    },
+    "United Kingdom": {
+      "n": 10,
+      "top1": 0.9,
+      "top3": 1.0
+    },
+    "Ireland": {
+      "n": 10,
+      "top1": 0.3,
+      "top3": 0.7
+    },
+    "France": {
+      "n": 10,
+      "top1": 0.4,
+      "top3": 0.8
+    },
+    "Spain": {
+      "n": 10,
+      "top1": 0.7,
+      "top3": 1.0
+    },
+    "Italy": {
+      "n": 10,
+      "top1": 0.6,
+      "top3": 0.7
+    },
+    "Germany": {
+      "n": 10,
+      "top1": 0.5,
+      "top3": 0.7
+    },
+    "Russia": {
+      "n": 10,
+      "top1": 0.7,
+      "top3": 0.7
+    },
+    "Poland": {
+      "n": 10,
+      "top1": 0.4,
+      "top3": 0.4
+    },
+    "Japan": {
+      "n": 10,
+      "top1": 0.8,
+      "top3": 0.9
+    },
+    "South Korea": {
+      "n": 10,
+      "top1": 0.8,
+      "top3": 0.9
+    },
+    "India": {
+      "n": 10,
+      "top1": 1.0,
+      "top3": 1.0
+    },
+    "Thailand": {
+      "n": 10,
+      "top1": 0.7,
+      "top3": 0.8
+    },
+    "South Africa": {
+      "n": 10,
+      "top1": 0.3,
+      "top3": 0.6
+    },
+    "Australia": {
+      "n": 10,
+      "top1": 1.0,
+      "top3": 1.0
+    }
+  },
+  "n_errors": 79,
+  "within_cluster_error_rate": 0.3924050632911392,
+  "rationale_contradiction": {
+    "rate": 0.0,
+    "n": 0,
+    "trial_ids": []
+  },
+  "length_normalized": {
+    "n": 200,
+    "raw_top1": 0.605,
+    "raw_top3": 0.795,
+    "norm_top1": 0.605,
+    "norm_top3": 0.79,
+    "top1_agreement": 0.98
+  },
+  "annotations": "annotations not provided",
+  "success_criteria": {
+    "study_set_size": {
+      "target": "200 trials, 10 per country",
+      "value": "200 trials, 10-10 per country over 20 countries",
+      "pass": true
+    },
+    "top1_accuracy": {
+      "target": "0.45-0.75",
+      "value": 0.605,
+      "pass": true
+    },
+    "top3_accuracy": {
+      "target": ">= 0.75",
+      "value": 0.795,
+      "pass": true
+    },
+    "human_catchable_share": {
+      "target": ">= 0.40 of top-1 errors with human_catchable=yes",
+      "value": null,
+      "value_yes_or_maybe": null,
+      "pass": null
+    }
+  }
+}
