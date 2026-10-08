@@ -203,3 +203,15 @@ def test_predict_record_real(gm, image):
     assert len(rec["top3"]) == 3 and all(t["rationale"] for t in rec["top3"])
     assert set(rec["logprobs"]) == set(CANDS) and all(v <= 0 for v in rec["logprobs"].values())
     assert rec["model_id"] == gm.model_id and rec["max_pixels"] == gm.max_pixels
+
+
+def test_tidy_rationale_strips_boilerplate_and_repeats():
+    raw = ("The specific things that suggest the photo was taken in Japan include the presence of a Korean "
+           "language sign, the style of the buildings, the presence of a Korean language sign, and the style "
+           "of the buildings.")
+    out = model.clean_rationale(raw)
+    assert out == "A Korean language sign, the style of the buildings."
+    assert model.clean_rationale(out) == out  # idempotent
+    assert model.clean_rationale("The presence of a red car suggests that the photo was taken in the United "
+                                 "States.") == "A red car."
+    assert model.clean_rationale("Road markings are white.") == "Road markings are white."

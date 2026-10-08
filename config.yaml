@@ -34,10 +34,11 @@ data:
   ocr_min_chars: 3
 
 model:
-  model_id: Qwen/Qwen3-VL-2B-Instruct
-  revision: 89644892e4d85e24eaac8bacfd4f463576704203
+  model_id: HuggingFaceTB/SmolVLM2-2.2B-Instruct   # weaker fallback (SPEC 5.1); Qwen3-VL-2B got 99% top-1 (iteration_log entry 4)
+  revision: 482adb537c021c86670beed01cd58990d01e72e4
   dtype: float16
-  max_pixels: 262144                    # ~512x512
+  max_pixels: 262144                    # ~512x512  (Qwen processors only)
+  image_splitting: false                # SmolVLM: one 384px view, no tiles (weaker + 10x faster; entry 4)
   device: auto                          # cuda > mps > cpu
 
 inference:
@@ -48,7 +49,7 @@ inference:
   score_batch_size: 5
   n_orderings: 1           # >1 averages logprobs over shuffled orderings (position bias)
   baseline_max_new_tokens: 512
-  prompt_versions: {rank: v1, explain: v2}   # explain v2: see iteration_log entry 2
+  prompt_versions: {rank: v1, explain: v4}   # v2 for Qwen (entry 2); v4 for SmolVLM (entry 4)
 
 eval:
   ece_bins: 10

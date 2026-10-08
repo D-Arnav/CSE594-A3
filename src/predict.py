@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import DATA, OUTPUTS, ROOT, countries, load_config, seed_everything  # noqa: E402
-from model import (TEMPERATURE_FILE, apply_temperature, candidate_order, fit_temperature,  # noqa: E402
+from model import (TEMPERATURE_FILE, apply_temperature, candidate_order, clean_rationale, fit_temperature,  # noqa: E402
                    load_temperature, predict_record)
 from prompts import render_json_baseline  # noqa: E402
 
@@ -251,6 +251,8 @@ def main():
         print(f"fitted T={T:.4f}  NLL {nll_before:.4f} -> {nll_after:.4f}  (n={len(records)})")
     for r in records:
         apply_temperature(r, T)
+        for t in r["top3"]:  # idempotent; re-applies the current rationale cleanup to stored records
+            t["rationale"] = clean_rationale(t["rationale"])
         r["temperature_source"] = source
     write_jsonl(raw_path, all_records)
 

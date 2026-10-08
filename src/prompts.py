@@ -36,6 +36,11 @@ PROMPT_EXPLAIN = {
         'Start directly with what you see; do not begin with "Yes" or "No".\n'
         "Only mention things that are actually visible."
     ),
+    # v4: for SmolVLM2, which copies v2's list of example cues verbatim. No example list.
+    "v4": (
+        "Look at this street-level photo. In one or two short sentences, describe the specific things you "
+        "can see that suggest whether it was taken in {country}."
+    ),
     # v3 (rejected, kept for the log): ask for one clue for and one against the country. The model
     # copied the template ("First sentence: ...") in 97.5% of outputs; v2 is used.
     "v3": (

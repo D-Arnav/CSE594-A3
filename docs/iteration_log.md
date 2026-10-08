@@ -142,12 +142,60 @@ too often empty to support verification in the human-AI condition. Per SPEC 9 th
   - CLIP cut-off of the kept 80: India 0.94, South Korea 0.82, Japan 0.66, US 0.60, Germany 0.07. Germany's
     candidates look least like "busy streets" (wide residential roads, some airport and park shots).
   - OCR flags text in 41 of 400 images, mostly South Korea (24 of 80 candidates).
-- **Dev / study metrics:** see below once inference finishes.
+- **Dev / study metrics (Qwen3-VL-2B, explain v2, T = 1.64):** dev top-1 97.5%, top-3 99.5%, ECE 0.019. Study
+  top-1 99.0% (2 errors in 200), top-3 99.5%, ECE 0.015. Outputs are in `outputs/archive_qwen_5country/`.
 - **Expected effect:** with 5 clear options, AI top-1 is likely to exceed the SPEC 0.3 band (45–75%). That weakens
   the "don't delegate" argument, and the top-3 cards cover 3 of the 5 countries. This is a deliberate trade-off
   for a clearer task, and it is discussed in the report.
 - The JSON baseline and the explain A/B in entries 1–2 were run on the 20-country dev set. Their outputs are in
   `outputs/archive_20country/`.
+
+---
+
+## 4. Weaker model: SmolVLM2-2.2B, no image tiling, explain v4 — 2026-10-07
+
+- **Changed:**
+  - `model.model_id` changed to `HuggingFaceTB/SmolVLM2-2.2B-Instruct` @ `482adb537c021c86670beed01cd58990d01e72e4`
+    (Apache-2.0), the SPEC 5.1 "weaker fallback".
+  - `model.image_splitting: false`: one 384 px view per photo instead of up to 16 tiles.
+  - `explain` changed v2 → v4, a plain "describe what suggests {country}" prompt with no example list.
+- **Why:** entry 3 put Qwen3-VL-2B at 99% top-1 on the 5-country urban set. With an AI that is almost never wrong,
+  people should delegate, so the study could not show complementarity and the error analysis had 2 errors. This
+  is SPEC 9's first-listed fix for "too easy", a weaker model.
+- **Dev check (8 dev images, before the full run):**
+  - With tiling: 7/8 top-1 at 5.4 s/img scoring.
+  - Without tiling: 5/8 at 0.5 s/img.
+  - With explain v2, SmolVLM2 copied the prompt's example list ("road markings, which side cars drive on, signs
+    and their script, …") instead of describing the photo. v4 gives specific, checkable statements, sometimes
+    false ones, e.g. "a license plate that starts with 'D'" and "the word 'MUDA' on a building" for a German
+    street.
+- **Dev / study metrics (T = 0.590 fitted on dev, NLL 0.838 → 0.772; T < 1 because SmolVLM2 is underconfident):**
+
+| Metric | Dev | Study |
+|---|---|---|
+| Top-1 | 72.5% [66.5, 78.0] | 71.0% [64.5, 77.0] |
+| Top-3 | 87.0% | 88.0% |
+| MRR | 0.824 | 0.814 |
+| ECE (10 bins) | 0.087 | 0.094 |
+| Top-1 accuracy by confidence tercile (low / mid / high) | 33.8 / 83.8 / 98.5% | 29.7 / 85.3 / 95.6% |
+| Top-1 errors | 55 | 58 |
+
+  Per country (study top-1): US 100%, Japan 97.5%, India 82.5%, South Korea 60% (confused with Japan), Germany
+  15% (mostly predicted United States or South Korea). Germany had the weakest CLIP "busy street" scores (entry 3).
+  Many errors come with plainly false evidence, which an attentive person can check, e.g. "Korean characters on
+  the license plates" for a German street (S008), or "a traditional Japanese kimono" (S017) and Japanese
+  characters (S018) in Indian street scenes.
+- **Rationale cleanup:** SmolVLM2's rationales repeated items in 39% of cases and opened with boilerplate in 77%
+  ("The specific things that suggest the photo was taken in X include the presence of …").
+  - `clean_rationale` now also strips that opener, the matching "… suggest that the photo was taken in X" closer,
+    every "the presence of", and repeated list items (`tidy_rationale`).
+  - On the 600 study rationales: repeats 39% → 7%, boilerplate 77% → 0%, mean length 178 → 112 characters.
+  - It is deterministic and idempotent. `predict.py` re-applies it to stored records, so the cleaned outputs
+    equal a full rerun. Rankings and metrics are unchanged.
+  - Blocking repeated 3-grams during decoding (`no_repeat_ngram_size=3`) was tried first and rejected because it
+    produced awkward phrasing ("the presence on the street of a car").
+- **Decision:** keep. Top-1 and top-3 are within the SPEC 0.3 targets, and confidence separates right from wrong
+  answers well, giving 58 study errors to annotate.
 
 ---
 

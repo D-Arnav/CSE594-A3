@@ -57,6 +57,12 @@ class GeoModel:
             # SmolVLM) longest_edge is an edge length, so they ignore max_pixels.
             ip.size = {"shortest_edge": min(ip.size["shortest_edge"], self.max_pixels),
                        "longest_edge": self.max_pixels}
+        else:
+            self.max_pixels = None  # not applied to this processor, so don't log it as if it were
+        # SmolVLM-style tiling (many image tokens per photo); config model.image_splitting overrides it.
+        if m.get("image_splitting") is not None and hasattr(ip, "do_image_splitting"):
+            ip.do_image_splitting = m["image_splitting"]
+        self.image_splitting = getattr(ip, "do_image_splitting", None)
         self.model = AutoModelForImageTextToText.from_pretrained(
             self.model_id, revision=self.revision, dtype=self.dtype).to(self.device).eval()
 
@@ -164,8 +170,35 @@ def clean_rationale(text):
     sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z"])', text)
     if len(sentences) > 1 and not sentences[-1].endswith((".", "!", "?", '"')):
         sentences.pop()
-    text = " ".join(sentences[:2]).strip()
+    text = tidy_rationale(" ".join(sentences[:2]).strip())
     return text or FALLBACK_RATIONALE
+
+
+# SmolVLM2 boilerplate: "The specific things that suggest the photo was taken in X include ...",
+# "... suggest that the photo was taken in X.", "the presence of" before every item, repeated items.
+_OPENER = re.compile(r"^(?:the )?(?:specific )?things that suggest (?:that )?(?:the|this|it) (?:photo |image )?"
+                     r"(?:was taken|was|is) (?:in|on|at) [^,:]*?\b(?:include|are|is)\b:?\s*", re.I)
+_TRAILER = re.compile(r",?\s*(?:all |which )?suggests? that (?:the|this) (?:photo|image) (?:was|is) taken "
+                      r"(?:in|on) [^.]*", re.I)
+_PRESENCE = re.compile(r"\bthe presence (?:and style )?of\s+", re.I)
+
+
+def tidy_rationale(text):
+    """Drop boilerplate and repeated list items so the card shows the evidence itself. Idempotent."""
+    out = []
+    for sent in re.split(r'(?<=[.!?])\s+(?=[A-Z"])', text):
+        sent = _PRESENCE.sub("", _TRAILER.sub("", _OPENER.sub("", sent)))
+        end = sent[-1] if sent and sent[-1] in ".!?" else ""
+        seen, items = set(), []
+        for item in sent.rstrip(".!?").split(", "):
+            key = re.sub(r"^and |[.\s]+$", "", item.lower())
+            if key not in seen:
+                seen.add(key)
+                items.append(item)
+        sent = ", ".join(items).strip() + end if items else ""
+        if sent:
+            out.append(sent[0].upper() + sent[1:])
+    return " ".join(out)
 
 
 # ---- probabilities / calibration ---------------------------------------------
@@ -261,7 +294,8 @@ def predict_record(gm, image, trial_id, cfg, candidates, temperature, key=None, 
     rec = {"trial_id": trial_id, "model_id": gm.model_id, "revision": gm.revision,
            "prompt_versions": dict(pv), "temperature": temperature, "candidate_order": orders[0],
            "logprobs": logprobs, "probs": {c: round(p, 4) for c, p in probs.items()},
-           "n_answer_tokens": runs[0][1], "top3": top3, "max_pixels": gm.max_pixels, "seed": seed,
+           "n_answer_tokens": runs[0][1], "top3": top3, "max_pixels": gm.max_pixels,
+           "image_splitting": getattr(gm, "image_splitting", None), "seed": seed,
            "runtime_s": round(t2 - t0, 2), "score_s": round(t1 - t0, 2), "explain_s": round(t2 - t1, 2)}
     if n_ord > 1:
         rec["candidate_orders"] = orders

@@ -4,10 +4,11 @@ Human-AI country geolocation from street-level photos (UMich CSE594, Assignments
 The full design is in [`docs/SPEC.md`](docs/SPEC.md).
 
 **Task.** Someone sees one street-level photo (OSV-5M / Mapillary) and picks the country it was taken in
-from a fixed list of 20 countries. These are grouped into 8 confusable clusters, e.g. United Kingdom/Ireland and Japan/South Korea.
+from a fixed list of 5 countries: United States, Germany, Japan, South Korea and India (Japan/South Korea is the
+confusable pair).
 Scoring is exact country match.
 
-**AI assistance.** A small local VLM, Qwen3-VL-2B-Instruct, proposes a ranked **top-3** list. Each guess has a
+**AI assistance.** A small local VLM, SmolVLM2-2.2B-Instruct, proposes a ranked **top-3** list. Each guess has a
 **confidence** and a **1–2 sentence rationale** that cites visible evidence. The pipeline has two stages:
 
 1. *Ranking:* the summed log-likelihood of each country name as the assistant answer to `PROMPT_RANK`, plus the
@@ -23,8 +24,8 @@ The ranking is always valid and well-defined. Section 5.2 of the SPEC explains w
 | Condition | Decision-maker sees | Response |
 |---|---|---|
 | AI-only | — | the model's top-1, computed offline |
-| Human-only | image + 20-country selector | one of 20 |
-| Human-AI | image + 3 AI cards (country, confidence, rationale) + "None of these" which opens the 20-country selector | one of 20 |
+| Human-only | image + 5 country buttons | one of 5 |
+| Human-AI | image + 3 AI cards (country, confidence, rationale) + "None of these", which opens the 5 country buttons | one of 5 |
 
 ## Repository layout
 
@@ -62,8 +63,10 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The model is `Qwen/Qwen3-VL-2B-Instruct` at revision `89644892e4d85e24eaac8bacfd4f463576704203` (pinned in
-`config.yaml`). It downloads from Hugging Face on first use (about 4 GB), and no token is needed.
+The model is `HuggingFaceTB/SmolVLM2-2.2B-Instruct` at revision `482adb537c021c86670beed01cd58990d01e72e4` (pinned in
+`config.yaml`, with image tiling off). It downloads from Hugging Face on first use (about 4.5 GB), and no token is
+needed. Qwen3-VL-2B-Instruct was used in earlier iterations; it was too accurate on the final task (99% top-1, see
+`docs/iteration_log.md` entry 4).
 Run every command below from the repo root.
 
 ## Reproduce in 3 commands
@@ -246,20 +249,18 @@ python src/finetune_lora.py train --config config.yaml --epochs 1 --out outputs/
 
 ## Results
 
-From `outputs/report/` (study) and `outputs/dev/report/` (dev). Ranking: rank prompt v1, summed log p; confidences
-use T = 2.87 fitted on dev; rationales use explain v2 (`docs/iteration_log.md`).
+From `outputs/report/` (study) and `outputs/dev/report/` (dev). Setup: 5 countries, urban OSV-5M images,
+SmolVLM2-2.2B-Instruct (no image tiling), rank prompt v1 with summed log p, T = 0.59 fitted on dev, and explain v4
+rationales. The history is in `docs/iteration_log.md`; earlier setups are kept in `outputs/archive_*`.
 
 | Metric | Study (n=200) | 95% CI | Dev (n=200) |
 |---|---|---|---|
-| Top-1 accuracy | 59.0% | 52.0–65.5 | 60.5% |
-| Top-3 accuracy | 81.0% | 75.0–86.0 | 79.5% |
-| MRR | 0.720 | 0.668–0.767 | 0.724 |
-| ECE (10 bins) | 0.052 | — | 0.082 |
+| Top-1 accuracy | 71.0% | 64.5–77.0 | 72.5% |
+| Top-3 accuracy | 88.0% | — | 87.0% |
+| MRR | 0.814 | — | 0.824 |
+| ECE (10 bins) | 0.094 | — | 0.087 |
+| Chance | 20% | — | 20% |
 | Human-catchable share of top-1 errors | _[TODO: after annotation]_ | — | — |
-| Fitted T (dev) | 2.87 | — | — |
-
-Live service: `/predict` for `S017` returns the same top-3 and probabilities as the cached CSV
-(`docs/screenshots/predict_S017.json`), and `tests/test_server.py -m model` checks parity on 5 study images.
 
 ## Tests
 
@@ -275,8 +276,9 @@ RUN_NETWORK_TESTS=1 python -m pytest   # also downloads from Hugging Face
   derived from [Mapillary](https://www.mapillary.com) street-level imagery and released under **CC-BY-SA 4.0**.
   Every row keeps its original `source_id` for attribution. Images in `data/` are redistributed under the same
   license, and faces and plates are blurred by Mapillary.
-- **Model:** [Qwen/Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct), **Apache-2.0**,
-  pinned at revision `89644892e4d85e24eaac8bacfd4f463576704203`. The model ID and revision are logged in every
+- **Model:** [HuggingFaceTB/SmolVLM2-2.2B-Instruct](https://huggingface.co/HuggingFaceTB/SmolVLM2-2.2B-Instruct),
+  **Apache-2.0**, pinned at revision `482adb537c021c86670beed01cd58990d01e72e4`. Earlier iterations used
+  Qwen/Qwen3-VL-2B-Instruct (Apache-2.0) at `89644892e4d85e24eaac8bacfd4f463576704203`. The model ID and revision are logged in every
   output record and CSV row.
 - **Code:** written for UMich CSE594 coursework.
 
@@ -290,6 +292,8 @@ RUN_NETWORK_TESTS=1 python -m pytest   # also downloads from Hugging Face
   *Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*.
 - Guo, C., Pleiss, G., Sun, Y., & Weinberger, K. Q. (2017). On Calibration of Modern Neural Networks. In
   *Proceedings of the 34th International Conference on Machine Learning (ICML)*, PMLR 70, 1321–1330.
+- Marafioti, A., et al. (2025). SmolVLM: Redefining small and efficient multimodal models. arXiv:2504.05299. Model
+  card: `HuggingFaceTB/SmolVLM2-2.2B-Instruct`, revision `482adb537c021c86670beed01cd58990d01e72e4`.
 - Qwen Team (2025). *Qwen3-VL-2B-Instruct* [model card]. Hugging Face, `Qwen/Qwen3-VL-2B-Instruct`, revision
   `89644892e4d85e24eaac8bacfd4f463576704203`. https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct
 - Bansal, G., Wu, T., Zhou, J., Fok, R., Nushi, B., Kamar, E., Ribeiro, M. T., & Weld, D. (2021). Does the Whole
