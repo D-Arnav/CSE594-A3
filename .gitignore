@@ -1,9 +1,6 @@
 .venv/
-data/raw/
-data/train/
+data/
+report/
+outputs/
+responses.db
 __pycache__/
-*.pyc
-.pytest_cache/
-study_app/responses.db
-outputs/lora/
-outputs/ui_dev/

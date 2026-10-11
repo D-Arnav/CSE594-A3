@@ -1,9 +1,0 @@
-{
-  "T": 0.5903211083205333,
-  "nll_before": 0.8377064526931133,
-  "nll_after": 0.7719645030203262,
-  "n": 200,
-  "split": "dev",
-  "model_id": "HuggingFaceTB/SmolVLM2-2.2B-Instruct",
-  "revision": "482adb537c021c86670beed01cd58990d01e72e4"
-}

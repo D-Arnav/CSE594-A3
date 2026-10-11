@@ -1,8 +1,0 @@
-INFO:     Started server process [14414]
-INFO:     Waiting for application startup.
-Loading weights:   0%|          | 0/625 [00:00<?, ?it/s]Loading weights:   0%|          | 1/625 [00:01<20:46,  2.00s/it]Loading weights:  32%|███▏      | 198/625 [00:02<00:03, 131.15it/s]Loading weights:  49%|████▉     | 305/625 [00:02<00:02, 132.61it/s]Loading weights:  59%|█████▉    | 369/625 [00:03<00:01, 166.71it/s]Loading weights:  69%|██████▊   | 429/625 [00:03<00:00, 204.42it/s]Loading weights:  78%|███████▊  | 487/625 [00:03<00:00, 245.80it/s]Loading weights:  87%|████████▋ | 544/625 [00:03<00:00, 287.37it/s]Loading weights:  96%|█████████▌| 600/625 [00:03<00:00, 256.38it/s]Loading weights: 100%|██████████| 625/625 [00:03<00:00, 165.22it/s]
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:57888 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57890 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57892 - "POST /predict HTTP/1.1" 200 OK
