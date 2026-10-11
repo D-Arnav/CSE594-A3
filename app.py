@@ -1,9 +1,14 @@
-"""Study server: one HTML page and a small JSON API.   uvicorn app:app --port 8501
+"""Study server: one HTML page and a small JSON API.
 
-The browser never gets the true country, human-only trials carry no AI fields, and correctness is computed here.
+uvicorn app:app --port 8501           # AI cards read from data/study_dataset.csv
+LIVE=1 uvicorn app:app --port 8501    # AI cards computed by the VLM (model.py) when a trial is shown
+
+The browser never gets the true country, human-only trials get no AI output, and correctness is computed here.
 """
+import os
 import random
 import sqlite3
+import threading
 import uuid
 from contextlib import closing
 from datetime import datetime, timezone
@@ -36,6 +41,11 @@ SETS = [order[j:N_SETS * BLOCK:N_SETS] for j in range(N_SETS)]
 rng.shuffle(SETS)  # set numbers carry no information about AI accuracy
 PRACTICE = dict(zip((HUMAN, HUMAN_AI), practice.trial_id))  # 2 photos outside the study set
 
+LIVE = os.environ.get("LIVE") == "1"
+if LIVE:
+    import model
+    MODEL, LOCK, CACHE = model.load(), threading.Lock(), {}
+
 
 def sequence(p):
     """Practice x2, then Block A and Block B for participant p. Over every cycle of 50 participants each set
@@ -54,14 +64,21 @@ def sequence(p):
 
 
 def view(t):
-    """What the browser gets for one trial."""
-    v = {**{k: t[k] for k in ("trial_order", "block", "condition", "is_practice", "trial_id")},
-         "image": f"/img/{t['trial_id']}"}
-    if t["condition"] == HUMAN_AI:
-        r = ROWS[t["trial_id"]]
-        v["ai"] = [{"rank": i, "country": r[f"ai_top{i}"], "p": float(r[f"ai_p{i}"]),
-                    "rationale": str(r[f"ai_rationale{i}"])} for i in (1, 2, 3)]
-    return v
+    """What the browser gets for one trial (the AI cards come separately, from /api/ai)."""
+    return {**{k: t[k] for k in ("trial_order", "block", "condition", "is_practice", "trial_id")},
+            "image": f"/img/{t['trial_id']}"}
+
+
+def ai(trial_id):
+    """The AI's 3 cards for a photo: from the dataset CSV, or, with LIVE=1, from the VLM now (once per photo)."""
+    r = ROWS[trial_id]
+    if LIVE:
+        with LOCK:  # one photo at a time on the GPU
+            if trial_id not in CACHE:
+                CACHE[trial_id] = model.row(r, *model.predict(*MODEL, r), model.T)
+        r = CACHE[trial_id]
+    return [{"rank": i, "country": r[f"ai_top{i}"], "p": float(r[f"ai_p{i}"]), "rationale": str(r[f"ai_rationale{i}"])}
+            for i in (1, 2, 3)]
 
 
 def db():
@@ -134,6 +151,16 @@ def image(trial_id: str):
     return FileResponse(ROOT / ROWS[trial_id]["image_path"])
 
 
+@app.get("/api/ai")
+def get_ai(pid: Pid, trial_order: int):
+    """AI cards for one of this participant's human-AI trials."""
+    with closing(db()) as conn:
+        trials = state(conn, pid)["trials"]
+    if not 0 <= trial_order < len(trials) or trials[trial_order]["condition"] != HUMAN_AI:
+        raise HTTPException(404, "no AI suggestions for this trial")
+    return ai(trials[trial_order]["trial_id"])
+
+
 @app.get("/api/session")
 def get_session(pid: Pid):
     with closing(db()) as conn:
@@ -164,13 +191,15 @@ def log_response(req: Response):
         trial = st["trials"][req.trial_order]
         if req.trial_id != trial["trial_id"]:
             raise HTTPException(422, "trial_id does not match this participant's sequence")
-        row = ROWS[req.trial_id]
+        row, top1 = ROWS[req.trial_id], ROWS[req.trial_id]["ai_top1"]
         if req.response not in COUNTRIES:
             raise HTTPException(422, "response not in label space")
         if trial["condition"] == HUMAN_AI:
             if req.chose_rank not in (0, 1, 2, 3) or (req.chose_rank == 0 and not req.expanded_other):
                 raise HTTPException(422, "chose_rank must be 1-3, or 0 after expanding 'None of these'")
-            if req.chose_rank and req.response != row[f"ai_top{req.chose_rank}"]:
+            cards = ai(req.trial_id)  # what was shown (live outputs can differ slightly across GPUs)
+            top1 = cards[0]["country"]
+            if req.chose_rank and req.response != cards[req.chose_rank - 1]["country"]:
                 raise HTTPException(422, "response does not match the chosen AI card")
         elif req.chose_rank is not None or req.expanded_other:
             raise HTTPException(422, "human-only trials have no AI choice")
@@ -178,7 +207,7 @@ def log_response(req: Response):
             "participant_id": req.pid, "session_id": st["session_id"], "block": trial["block"],
             "condition": trial["condition"], "trial_order": req.trial_order, "trial_id": req.trial_id,
             "response": req.response, "correct": int(req.response == row["country"]), "chose_rank": req.chose_rank,
-            "ai_top1_correct": int(row["ai_top1"] == row["country"]), "rt_ms": req.rt_ms,
+            "ai_top1_correct": int(top1 == row["country"]), "rt_ms": req.rt_ms,
             "expanded_other": int(req.expanded_other), "timestamp": now(), "is_practice": int(trial["is_practice"])})
     return {"done": req.trial_order + 1}
 

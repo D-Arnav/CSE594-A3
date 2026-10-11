@@ -35,7 +35,7 @@ data/annotations.csv             error labels from two LLM raters, plus the adju
 uvicorn app:app --port 8501
 ```
 
-Open http://localhost:8501. Give each participant a link with their own number, `?pid=0`, `?pid=1`, …
+Add `LIVE=1` in front to have the AI compute its suggestions live (see below). Open http://localhost:8501. Give each participant a link with their own number, `?pid=0`, `?pid=1`, …
 (even numbers start without the AI, odd numbers with it); without one, the next free number is used.
 To share it from a laptop: `cloudflared tunnel --url http://localhost:8501`. Back up `responses.db`, and restart
 the server after changing the data.
@@ -53,10 +53,20 @@ needed). For each photo `model.py`:
 3. **Writes a rationale** for each of the top 3 countries: it asks the model what it sees that suggests that
    country, then cuts the answer to two sentences.
 
+### Run the AI live
+
 ```bash
-python model.py S017                  # one trial, printed (about 30 s including model loading)
+python model.py S017                  # the AI on one study photo: top 3 countries, confidences, rationales
+python model.py my_photo.jpg          # the AI on any photo of your own
+LIVE=1 uvicorn app:app --port 8501    # the study with every AI card computed by the model as the trial is shown
 python model.py study                 # all 200 study photos -> data/study_dataset.csv (~20 min)
 ```
+
+The first command takes about 30 s: 15–20 s to load the model, then about 6 s per photo. In the live study the
+server loads the model at startup. It computes each photo's cards when a participant reaches that trial,
+fetching one trial ahead so there is usually no wait, and reuses them for later participants. Without `LIVE=1` the
+study reads the same cards from `data/study_dataset.csv`, which needs no GPU. Live and saved cards are identical on
+the machine that made the dataset.
 
 It picks the device automatically (NVIDIA GPU, then Apple silicon, then CPU). A CPU works but is much slower.
 Decoding is greedy, so a rerun reproduces the outputs in `data/study_dataset.csv`. On a Mac, prefix long runs with

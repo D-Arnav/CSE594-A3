@@ -126,9 +126,16 @@ function instructions() {
     h("button", {className: "primary", textContent: "Start", onclick: next}));
 }
 
+// AI cards per trial, fetched once (with LIVE=1 the server runs the model, ~6 s per photo, so fetch ahead)
+const AI = {};
+const aiCards = t => AI[t.trial_order] ??= api(`/api/ai?pid=${S.pid}&trial_order=${t.trial_order}`)
+  .catch(e => { delete AI[t.trial_order]; throw e; });
+const fetchAhead = t => { if (t?.condition === "human_ai") aiCards(t).catch(() => {}); };
+
 function next() {
   if (S.done >= S.trials.length) return S.survey_done ? thanks() : survey();
   const t = S.trials[S.done], prev = S.trials[S.done - 1];
+  fetchAhead(t);
   if (prev && prev.block === t.block && prev.condition === t.condition) return trial(t);
   const what = t.condition === "human_ai" ? WITH_AI : ALONE;
   page(h("p", {}, h("strong", {}, t.is_practice ? "Practice photo (not scored). " : `Part ${t.block} · ${blockSize()} photos. `), what),
@@ -136,7 +143,7 @@ function next() {
 }
 
 function trial(t) {
-  let sel = null, t0 = performance.now(), busy = false, expanded = false;
+  let sel = null, t0 = performance.now(), busy = false, expanded = false, cards = null;
   const ai = t.condition === "human_ai";
   const inBlock = S.trials.filter(x => x.block === t.block);
   const progress = t.is_practice ? "Practice · not scored" : `Part ${t.block} · ${inBlock.indexOf(t) + 1} / ${inBlock.length}`;
@@ -156,9 +163,10 @@ function trial(t) {
 
   function render() {
     if (!ai) return choices.replaceChildren(h("p", {className: "q"}, "Which country was this photo taken in?"), ...countryButtons(null));
+    if (!cards) return choices.replaceChildren(h("div", {className: "banner"}, BANNER), h("p", {className: "muted"}, "The AI is looking at the photo…"));
     choices.replaceChildren(
       h("div", {className: "banner"}, BANNER),
-      ...t.ai.map(c => opt(c.country, c.rank, "card",
+      ...cards.map(c => opt(c.country, c.rank, "card",
         h("span", {className: "head"}, c.country, h("span", {}, Math.round(c.p * 100) + "%")),
         h("span", {className: "bar"}, h("i", {style: `width:${Math.max(1, Math.round(c.p * 100))}%`})),
         h("span", {className: "why"}, c.rationale))),
@@ -194,8 +202,12 @@ function trial(t) {
     // Enter submits, except on a non-choice button or an unselected choice (those handle Enter natively)
     else if (e.key === "Enter" && !e.target.closest?.("button:not(.opt), .opt[aria-pressed=false]")) { e.preventDefault(); submit(); }
   };
+  // the response time starts once both the photo and the AI cards are on screen
+  if (ai) aiCards(t).then(c => { cards = c; t0 = performance.now(); render(); },
+                          () => { err.textContent = "Could not load the AI's suggestions. Please reload the page."; });
   const after = S.trials[t.trial_order + 1];
   if (after) new Image().src = after.image;  // preload
+  fetchAhead(after);
 }
 
 function survey() {

@@ -1,7 +1,8 @@
 """AI assistance: SmolVLM2 ranks the 5 countries for a photo and explains its top 3.
 
-python model.py study   # score every study photo, write data/study_dataset.csv
-python model.py S017    # print one trial (evidence that the model runs)
+python model.py S017            # run the AI live on one study photo and print its top 3
+python model.py my_photo.jpg    # ... or on any photo
+python model.py study           # run it on all 200 study photos, write data/study_dataset.csv
 """
 import copy
 import json
@@ -144,6 +145,8 @@ def row(trial, lp, ranked, why, T):
 
 def main(arg):
     meta = pd.read_csv(DATA / "study/study_meta.csv", dtype=str)
+    if arg != "study" and arg not in set(meta.trial_id) and not Path(arg).is_file():
+        sys.exit(f"{arg!r} is not 'study', a study trial id (S001-S200) or an image file\n\n{__doc__}")
     proc, vlm = load()
     if arg == "study":
         trials = meta.to_dict("records")
@@ -155,11 +158,13 @@ def main(arg):
         df.to_csv(DATA / "study_dataset.csv", index=False)
         print(f"top-1 {df.ai_correct_top1.mean():.3f}  top-3 {df.ai_correct_top3.mean():.3f}")
     else:
-        t = meta.set_index("trial_id").loc[arg].to_dict() | {"trial_id": arg}
-        r = row(t, *predict(proc, vlm, t), T)
-        print(f"{arg}  true country: {t['country']}")
-        for i in (1, 2, 3):
-            print(f"{i}. {r[f'ai_top{i}']:<14} {r[f'ai_p{i}']:.2f}  {r[f'ai_rationale{i}']}")
+        t = (meta.set_index("trial_id").loc[arg].to_dict() | {"trial_id": arg} if arg in set(meta.trial_id)
+             else {"trial_id": Path(arg).stem, "image_path": Path(arg).resolve()})
+        lp, ranked, why = predict(proc, vlm, t)
+        p = softmax(lp, T)
+        print(f"{arg}  true country: {t.get('country', 'unknown')}")
+        for i in range(3):
+            print(f"{i + 1}. {ranked[i]:<14} {round(p[ranked[i]], 2):.2f}  {why[i]}")
 
 
 if __name__ == "__main__":
