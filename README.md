@@ -24,9 +24,8 @@ The photos come from [OpenStreetView-5M](https://huggingface.co/datasets/osv5m/o
 
 ```
 data/study/S001.jpg … S200.jpg   200 study photos (40 per country) + study_meta.csv (trial_id, image_path, source_id, country)
-data/dev/D001.jpg … D200.jpg     200 dev photos (fit the confidence temperature, practice trials) + dev_meta.csv
 data/study_dataset.csv           the study dataset: inputs, ground truth, AI outputs, error labels
-data/dev_dataset.csv             the same for the dev photos
+data/practice/P01.jpg, P02.jpg   2 practice photos (not study trials) + practice.csv with their AI outputs
 data/annotations.csv             error labels from two LLM raters, plus the adjudicated label
 ```
 
@@ -44,9 +43,8 @@ the server after changing the data.
 ## Reproduce
 
 ```bash
-python evaluate.py                    # metrics + error table, no GPU; also writes the final labels into data/study_dataset.csv
-caffeinate -i python model.py dev     # AI outputs for the dev photos + the temperature (~20 min on Apple silicon)
-caffeinate -i python model.py study   # AI outputs for the study photos (~20 min)
+python evaluate.py                    # every table: metrics + error table, no GPU (also writes the labels into data/study_dataset.csv)
+caffeinate -i python model.py study   # regenerate the AI outputs for the study photos (~20 min on Apple silicon)
 python model.py S017                  # one trial, printed
 ```
 

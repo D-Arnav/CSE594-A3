@@ -24,8 +24,8 @@ RESPONSE_COLS = ["participant_id", "session_id", "block", "condition", "trial_or
 SURVEY_COLS = ["participant_id", "session_id", "trust", "usefulness", "geo_knowledge", "free_text", "timestamp"]
 
 study = pd.read_csv(ROOT / "data/study_dataset.csv", dtype={"trial_id": str}, keep_default_na=False)
-dev = pd.read_csv(ROOT / "data/dev_dataset.csv", dtype={"trial_id": str}, keep_default_na=False)
-ROWS = {r["trial_id"]: r for r in pd.concat([study, dev]).to_dict("records")}
+practice = pd.read_csv(ROOT / "data/practice.csv", dtype={"trial_id": str}, keep_default_na=False)
+ROWS = {r["trial_id"]: r for r in pd.concat([study, practice]).to_dict("records")}
 
 # 25 sets of 8: sort by (AI right?, country, seeded tiebreak) and deal round-robin, so every set gets a similar mix
 rng = random.Random(SEED)
@@ -34,7 +34,7 @@ order = [k[-1] for k in sorted((str(r["ai_correct_top1"]) == "True", r["country"
 N_SETS = len(order) // BLOCK
 SETS = [order[j:N_SETS * BLOCK:N_SETS] for j in range(N_SETS)]
 rng.shuffle(SETS)  # set numbers carry no information about AI accuracy
-PRACTICE = dict(zip((HUMAN, HUMAN_AI), random.Random(SEED).sample(sorted(dev.trial_id), 2)))  # not study photos
+PRACTICE = dict(zip((HUMAN, HUMAN_AI), practice.trial_id))  # 2 photos outside the study set
 
 
 def sequence(p):

@@ -1,7 +1,6 @@
 """AI assistance: SmolVLM2 ranks the 5 countries for a photo and explains its top 3.
 
-python model.py dev     # score data/dev photos, fit the temperature T, write data/dev_dataset.csv
-python model.py study   # score data/study photos with that T, write data/study_dataset.csv
+python model.py study   # score every study photo, write data/study_dataset.csv
 python model.py S017    # print one trial (evidence that the model runs)
 """
 import copy
@@ -21,6 +20,8 @@ from transformers import AutoModelForImageTextToText, AutoProcessor
 MODEL_ID, REVISION = "HuggingFaceTB/SmolVLM2-2.2B-Instruct", "482adb537c021c86670beed01cd58990d01e72e4"
 COUNTRIES = ["United States", "Germany", "Japan", "South Korea", "India"]
 SEED = 42
+# Confidence temperature (Guo et al. 2017), fitted by minimizing NLL on a separate set of 200 calibration photos.
+T = 0.5903211083205333
 RANK = ("You are shown a street-level photo. It was taken in exactly one of these countries:\n"
         "{countries}\nWhich country was it taken in? Answer with the country name only.")
 EXPLAIN = ("Look at this street-level photo. In one or two short sentences, describe the specific things you "
@@ -121,31 +122,6 @@ def softmax(lp, T):
     return dict(zip(lp, (p / p.sum()).tolist()))
 
 
-def nll(L, y, T):
-    z = L / T
-    z = z - z.max(axis=1, keepdims=True)
-    return float(np.mean(np.log(np.exp(z).sum(axis=1)) - z[np.arange(len(y)), y]))
-
-
-def fit_temperature(lps, labels, lo=0.05, hi=20.0, iters=80):
-    """Temperature scaling (Guo et al. 2017): golden-section search on log T minimizing dev NLL."""
-    L = np.array([list(d.values()) for d in lps], dtype=float)
-    y = np.array([COUNTRIES.index(c) for c in labels])
-    a, b, g = math.log(lo), math.log(hi), (math.sqrt(5) - 1) / 2
-    c, d = b - g * (b - a), a + g * (b - a)
-    fc, fd = nll(L, y, math.exp(c)), nll(L, y, math.exp(d))
-    for _ in range(iters):
-        if fc < fd:
-            b, d, fd = d, c, fc
-            c = b - g * (b - a)
-            fc = nll(L, y, math.exp(c))
-        else:
-            a, c, fc = c, d, fd
-            d = a + g * (b - a)
-            fd = nll(L, y, math.exp(d))
-    return math.exp((a + b) / 2)
-
-
 def predict(proc, vlm, trial):
     """-> (logprobs, countries ranked best first, rationales for the top 3) for one meta row."""
     order = list(COUNTRIES)
@@ -167,25 +143,21 @@ def row(trial, lp, ranked, why, T):
 
 
 def main(arg):
-    dev_csv = DATA / "dev_dataset.csv"
-    meta = {s: pd.read_csv(DATA / s / f"{s}_meta.csv", dtype=str) for s in ("dev", "study")}
+    meta = pd.read_csv(DATA / "study/study_meta.csv", dtype=str)
     proc, vlm = load()
-    if arg in meta:
-        trials = meta[arg].to_dict("records")
+    if arg == "study":
+        trials = meta.to_dict("records")
         out = []
         for i, t in enumerate(trials, 1):
-            out.append(predict(proc, vlm, t))
-            print(f"{arg} {i}/{len(trials)}", flush=True)
-        T = (fit_temperature([o[0] for o in out], [t["country"] for t in trials]) if arg == "dev"
-             else float(pd.read_csv(dev_csv)["temperature"].iloc[0]))
-        df = pd.DataFrame([row(t, *o, T) for t, o in zip(trials, out)])
-        df.to_csv(DATA / f"{arg}_dataset.csv", index=False)
-        print(f"T={T:.4f}  top-1 {df.ai_correct_top1.mean():.3f}  top-3 {df.ai_correct_top3.mean():.3f}")
+            out.append(row(t, *predict(proc, vlm, t), T))
+            print(f"{i}/{len(trials)}", flush=True)
+        df = pd.DataFrame(out)
+        df.to_csv(DATA / "study_dataset.csv", index=False)
+        print(f"top-1 {df.ai_correct_top1.mean():.3f}  top-3 {df.ai_correct_top3.mean():.3f}")
     else:
-        t = pd.concat(meta.values()).set_index("trial_id").loc[arg].to_dict() | {"trial_id": arg}
-        T = float(pd.read_csv(dev_csv)["temperature"].iloc[0]) if dev_csv.exists() else 1.0
+        t = meta.set_index("trial_id").loc[arg].to_dict() | {"trial_id": arg}
         r = row(t, *predict(proc, vlm, t), T)
-        print(f"{arg}  true country: {t['country']}  (T={T:.2f})")
+        print(f"{arg}  true country: {t['country']}")
         for i in (1, 2, 3):
             print(f"{i}. {r[f'ai_top{i}']:<14} {r[f'ai_p{i}']:.2f}  {r[f'ai_rationale{i}']}")
 
