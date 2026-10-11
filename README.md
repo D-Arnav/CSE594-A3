@@ -40,16 +40,32 @@ Open http://localhost:8501. Give each participant a link with their own number, 
 To share it from a laptop: `cloudflared tunnel --url http://localhost:8501`. Back up `responses.db`, and restart
 the server after changing the data.
 
-## Reproduce
+## AI model (`model.py`)
+
+The AI is [SmolVLM2-2.2B-Instruct](https://huggingface.co/HuggingFaceTB/SmolVLM2-2.2B-Instruct) (Apache-2.0),
+pinned to revision `482adb5`. It downloads from Hugging Face on first run (about 4.5 GB; no account or token
+needed). For each photo `model.py`:
+
+1. **Ranks the 5 countries:** it asks the model which of the 5 countries (listed in a per-photo random order) the
+   photo is from, and scores the log-likelihood of each country name as the answer.
+2. **Turns the scores into confidences:** a softmax with temperature T = 0.59, which was fitted beforehand on a
+   separate set of calibration photos.
+3. **Writes a rationale** for each of the top 3 countries: it asks the model what it sees that suggests that
+   country, then cuts the answer to two sentences.
 
 ```bash
-python evaluate.py                    # every table: metrics + error table, no GPU (also writes the labels into data/study_dataset.csv)
-caffeinate -i python model.py study   # regenerate the AI outputs for the study photos (~20 min on Apple silicon)
-python model.py S017                  # one trial, printed
+python model.py S017                  # one trial, printed (about 30 s including model loading)
+python model.py study                 # all 200 study photos -> data/study_dataset.csv (~20 min)
 ```
 
-The model (`HuggingFaceTB/SmolVLM2-2.2B-Instruct` at revision `482adb5`, Apache-2.0, about 4.5 GB) downloads from
-Hugging Face on first use. `caffeinate` keeps a Mac awake; leave it out elsewhere.
+It picks the device automatically (NVIDIA GPU, then Apple silicon, then CPU). A CPU works but is much slower.
+Decoding is greedy, so a rerun reproduces the outputs in `data/study_dataset.csv`. On a Mac, prefix long runs with
+`caffeinate -i` so the machine doesn't sleep.
 
-The full development pipeline (dataset building, tests, earlier iterations) is on the git branch `full-pipeline`.
-Read it with `git show full-pipeline:<path>`; checking that branch out and back would delete the untracked `data/`.
+## Reproduce the tables
+
+```bash
+python evaluate.py      # metrics + error table from data/study_dataset.csv and data/annotations.csv; no GPU
+```
+
+It also writes the final error labels into `data/study_dataset.csv`.
