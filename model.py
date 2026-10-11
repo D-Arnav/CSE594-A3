@@ -1,8 +1,3 @@
-"""AI assistance: SmolVLM2 ranks the 5 countries for a photo and explains its top 3.
-
-python model.py    # run it on all 200 study photos, write data/study_dataset.csv (~20 min on Apple silicon)
-Imported by app.py to run the AI live (LIVE=1).
-"""
 import copy
 import json
 import math
@@ -19,7 +14,6 @@ from transformers import AutoModelForImageTextToText, AutoProcessor
 MODEL_ID, REVISION = "HuggingFaceTB/SmolVLM2-2.2B-Instruct", "482adb537c021c86670beed01cd58990d01e72e4"
 COUNTRIES = ["United States", "Germany", "Japan", "South Korea", "India"]
 SEED = 42
-# Confidence temperature (Guo et al. 2017), fitted by minimizing NLL on a separate set of 200 calibration photos.
 T = 0.5903211083205333
 RANK = ("You are shown a street-level photo. It was taken in exactly one of these countries:\n"
         "{countries}\nWhich country was it taken in? Answer with the country name only.")
@@ -84,8 +78,6 @@ def explain(proc, vlm, image, country):
     return clean(proc.tokenizer.decode(out[0, ids["input_ids"].shape[1]:], skip_special_tokens=True))
 
 
-# SmolVLM2 boilerplate: "The specific things that suggest the photo was taken in X include ...",
-# "... suggest that the photo was taken in X.", "the presence of" before every item, repeated items.
 OPENER = re.compile(r"^(?:the )?(?:specific )?things that suggest (?:that )?(?:the|this|it) (?:photo |image )?"
                     r"(?:was taken|was|is) (?:in|on|at) [^,:]*?\b(?:include|are|is)\b:?\s*", re.I)
 TRAILER = re.compile(r",?\s*(?:all |which )?suggests? that (?:the|this) (?:photo|image) (?:was|is) taken "
@@ -95,7 +87,6 @@ SENTENCE = r'(?<=[.!?])\s+(?=[A-Z"])'  # "U.S. roads" stays whole
 
 
 def clean(text):
-    """At most two sentences (a fragment cut off by the token limit is dropped), minus boilerplate and repeats."""
     sentences = re.split(SENTENCE, " ".join((text or "").split()))
     if len(sentences) > 1 and not sentences[-1].endswith((".", "!", "?", '"')):
         sentences.pop()

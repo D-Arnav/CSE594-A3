@@ -1,10 +1,3 @@
-"""Study server: one HTML page and a small JSON API.
-
-uvicorn app:app --port 8501           # AI cards read from data/study_dataset.csv
-LIVE=1 uvicorn app:app --port 8501    # AI cards computed by the VLM (model.py) when a trial is shown
-
-The browser never gets the true country, human-only trials get no AI output, and correctness is computed here.
-"""
 import os
 import random
 import sqlite3
@@ -32,14 +25,13 @@ study = pd.read_csv(ROOT / "data/study_dataset.csv", dtype={"trial_id": str}, ke
 practice = pd.read_csv(ROOT / "data/practice.csv", dtype={"trial_id": str}, keep_default_na=False)
 ROWS = {r["trial_id"]: r for r in pd.concat([study, practice]).to_dict("records")}
 
-# 25 sets of 8: sort by (AI right?, country, seeded tiebreak) and deal round-robin, so every set gets a similar mix
 rng = random.Random(SEED)
 order = [k[-1] for k in sorted((str(r["ai_correct_top1"]) == "True", r["country"], rng.random(), r["trial_id"])
                                for r in study.to_dict("records"))]
 N_SETS = len(order) // BLOCK
 SETS = [order[j:N_SETS * BLOCK:N_SETS] for j in range(N_SETS)]
-rng.shuffle(SETS)  # set numbers carry no information about AI accuracy
-PRACTICE = dict(zip((HUMAN, HUMAN_AI), practice.trial_id))  # 2 photos outside the study set
+rng.shuffle(SETS) 
+PRACTICE = dict(zip((HUMAN, HUMAN_AI), practice.trial_id)) 
 
 LIVE = os.environ.get("LIVE") == "1"
 if LIVE:
@@ -48,9 +40,6 @@ if LIVE:
 
 
 def sequence(p):
-    """Practice x2, then Block A and Block B for participant p. Over every cycle of 50 participants each set
-    appears once per condition and block position; participants 2k and 2k+1 see the same two sets with the
-    conditions swapped, so every photo is seen in both conditions and nobody sees a photo twice."""
     cycle, slot = divmod(p, 2 * N_SETS)
     first, second = slot // 2, (slot // 2 + 1 + cycle % (N_SETS - 1)) % N_SETS
     blocks = [(first, HUMAN), (second, HUMAN_AI)] if p % 2 == 0 else [(first, HUMAN_AI), (second, HUMAN)]
@@ -64,16 +53,14 @@ def sequence(p):
 
 
 def view(t):
-    """What the browser gets for one trial (the AI cards come separately, from /api/ai)."""
     return {**{k: t[k] for k in ("trial_order", "block", "condition", "is_practice", "trial_id")},
             "image": f"/img/{t['trial_id']}"}
 
 
 def ai(trial_id):
-    """The AI's 3 cards for a photo: from the dataset CSV, or, with LIVE=1, from the VLM now (once per photo)."""
     r = ROWS[trial_id]
     if LIVE:
-        with LOCK:  # one photo at a time on the GPU
+        with LOCK:
             if trial_id not in CACHE:
                 CACHE[trial_id] = model.row(r, *model.predict(*MODEL, r), model.T)
         r = CACHE[trial_id]
@@ -153,7 +140,6 @@ def image(trial_id: str):
 
 @app.get("/api/ai")
 def get_ai(pid: Pid, trial_order: int):
-    """AI cards for one of this participant's human-AI trials."""
     with closing(db()) as conn:
         trials = state(conn, pid)["trials"]
     if not 0 <= trial_order < len(trials) or trials[trial_order]["condition"] != HUMAN_AI:
@@ -169,7 +155,6 @@ def get_session(pid: Pid):
 
 @app.post("/api/session")
 def new_session(req: NewSession):
-    """Register a participant: the next free id (one atomic statement) unless pid is given; a known pid resumes."""
     with closing(db()) as conn, conn:
         if req.pid is None:
             cur = conn.execute("INSERT INTO participants SELECT COALESCE(MAX(participant_id), -1) + 1, ?, ? "

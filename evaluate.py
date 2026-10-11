@@ -1,4 +1,3 @@
-"""The two tables in the report: AI metrics and error analysis.   python evaluate.py"""
 import numpy as np
 import pandas as pd
 
@@ -6,7 +5,6 @@ df = pd.read_csv("data/study_dataset.csv", dtype={"trial_id": str}, keep_default
 ann = pd.read_csv("data/annotations.csv", dtype={"trial_id": str}, keep_default_na=False)
 right, p1 = (df.ai_correct_top1.astype(str) == "True").to_numpy(float), df.ai_p1.to_numpy(float)
 
-# Expected calibration error: 10 equal-width bins on top-1 confidence (1.0 goes in the last bin)
 b = np.minimum((p1 * 10).astype(int), 9)
 ece = sum((b == i).mean() * abs(right[b == i].mean() - p1[b == i].mean()) for i in range(10) if (b == i).any())
 
