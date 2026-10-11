@@ -65,7 +65,7 @@ python model.py study                 # all 200 study photos -> data/study_datas
 The first command takes about 30 s: 15–20 s to load the model, then about 6 s per photo. In the live study the
 server loads the model at startup. It computes each photo's cards when a participant reaches that trial,
 fetching one trial ahead so there is usually no wait, and reuses them for later participants. Without `LIVE=1` the
-study reads the same cards from `data/study_dataset.csv`, which needs no GPU. Live and saved cards are identical on
+study reads the same cards from `data/study_dataset.csv`, which needs no GPU. Live and saved study cards are identical on
 the machine that made the dataset.
 
 It picks the device automatically (NVIDIA GPU, then Apple silicon, then CPU). A CPU works but is much slower.
