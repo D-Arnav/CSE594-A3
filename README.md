@@ -72,7 +72,6 @@ Decoding is greedy, so a rerun reproduces the outputs in `data/study_dataset.csv
 ## Reproduce the tables
 
 ```bash
-python evaluate.py      # metrics + error table from data/study_dataset.csv and data/annotations.csv; no GPU
+python evaluate.py      # the report's two tables (metrics, error analysis) from data/study_dataset.csv
+                        # and data/annotations.csv; no GPU
 ```
-
-It also writes the final error labels into `data/study_dataset.csv`.
