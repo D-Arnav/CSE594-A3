@@ -1,6 +1,5 @@
 .venv/
 data/
-report/
-outputs/
+temp/
 responses.db
 __pycache__/

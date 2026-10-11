@@ -17,10 +17,10 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Data (stored separately)
+## Data
 
 The photos come from [OpenStreetView-5M](https://huggingface.co/datasets/osv5m/osv5m) (CC-BY-SA 4.0).
-Put the dataset folder at `data/`:
+`data/` is included in the submission but not tracked in git:
 
 ```
 data/study/S001.jpg … S200.jpg   200 study photos (40 per country) + study_meta.csv (trial_id, image_path, source_id, country)
