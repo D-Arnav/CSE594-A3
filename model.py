@@ -1,15 +1,13 @@
 """AI assistance: SmolVLM2 ranks the 5 countries for a photo and explains its top 3.
 
-python model.py S017            # run the AI live on one study photo and print its top 3
-python model.py my_photo.jpg    # ... or on any photo
-python model.py study           # run it on all 200 study photos, write data/study_dataset.csv
+python model.py    # run it on all 200 study photos, write data/study_dataset.csv (~20 min on Apple silicon)
+Imported by app.py to run the AI live (LIVE=1).
 """
 import copy
 import json
 import math
 import random
 import re
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -143,31 +141,17 @@ def row(trial, lp, ranked, why, T):
             "model_id": MODEL_ID, "revision": REVISION}
 
 
-def main(arg):
-    meta = pd.read_csv(DATA / "study/study_meta.csv", dtype=str)
-    if arg != "study" and arg not in set(meta.trial_id) and not Path(arg).is_file():
-        sys.exit(f"{arg!r} is not 'study', a study trial id (S001-S200) or an image file\n\n{__doc__}")
+def main():
+    trials = pd.read_csv(DATA / "study/study_meta.csv", dtype=str).to_dict("records")
     proc, vlm = load()
-    if arg == "study":
-        trials = meta.to_dict("records")
-        out = []
-        for i, t in enumerate(trials, 1):
-            out.append(row(t, *predict(proc, vlm, t), T))
-            print(f"{i}/{len(trials)}", flush=True)
-        df = pd.DataFrame(out)
-        df.to_csv(DATA / "study_dataset.csv", index=False)
-        print(f"top-1 {df.ai_correct_top1.mean():.3f}  top-3 {df.ai_correct_top3.mean():.3f}")
-    else:
-        t = (meta.set_index("trial_id").loc[arg].to_dict() | {"trial_id": arg} if arg in set(meta.trial_id)
-             else {"trial_id": Path(arg).stem, "image_path": Path(arg).resolve()})
-        lp, ranked, why = predict(proc, vlm, t)
-        p = softmax(lp, T)
-        print(f"{arg}  true country: {t.get('country', 'unknown')}")
-        for i in range(3):
-            print(f"{i + 1}. {ranked[i]:<14} {round(p[ranked[i]], 2):.2f}  {why[i]}")
+    out = []
+    for i, t in enumerate(trials, 1):
+        out.append(row(t, *predict(proc, vlm, t), T))
+        print(f"{i}/{len(trials)}", flush=True)
+    df = pd.DataFrame(out)
+    df.to_csv(DATA / "study_dataset.csv", index=False)
+    print(f"top-1 {df.ai_correct_top1.mean():.3f}  top-3 {df.ai_correct_top3.mean():.3f}")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.exit(__doc__)
-    main(sys.argv[1])
+    main()

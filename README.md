@@ -56,14 +56,11 @@ needed). For each photo `model.py`:
 ### Run the AI live
 
 ```bash
-python model.py S017                  # the AI on one study photo: top 3 countries, confidences, rationales
-python model.py my_photo.jpg          # the AI on any photo of your own
 LIVE=1 uvicorn app:app --port 8501    # the study with every AI card computed by the model as the trial is shown
-python model.py study                 # all 200 study photos -> data/study_dataset.csv (~20 min)
+python model.py                       # all 200 study photos -> data/study_dataset.csv (~20 min)
 ```
 
-The first command takes about 30 s: 15–20 s to load the model, then about 6 s per photo. In the live study the
-server loads the model at startup. It computes each photo's cards when a participant reaches that trial,
+The model takes 15–20 s to load, then about 6 s per photo. In the live study the server loads the model at startup. It computes each photo's cards when a participant reaches that trial,
 fetching one trial ahead so there is usually no wait, and reuses them for later participants. Without `LIVE=1` the
 study reads the same cards from `data/study_dataset.csv`, which needs no GPU. Live and saved study cards are identical on
 the machine that made the dataset.
