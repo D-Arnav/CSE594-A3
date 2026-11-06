@@ -1,0 +1,35 @@
+Complete your classmate's tasks
+Have completed at least 6 tasks of others’ in both conditions, and submitted your name and comments on the spreadsheets
+10pt
+
+Task Interfaces
+The two task interfaces are running on a worker sandbox (or your own interface) with no critical bugs at the time of grading. 15 pts each. Provided descriptions (and supporting code or files) for design decisions and bonus steps completed, if any.
+30pt
+
+[Bonus] Set up your own interface
+Set up your own interface (full backend implementation needed, Google Forms etc. don't count)
+10pt
+
+[Bonus] Synchronous AI output
+Directly integrate the model or API call in your interface, so that the participant will get the AI output in real time.
+5pt
+
+Collect Data
+Have collected data from at least 5 participants in each condition, and data is successfully recorded.
+20pt
+
+Data Analysis Results
+Have conducted proper analysis on the collected data and submitted the results report, including explanations (and supporting code or files) of how and why they were done
+30pt
+
+[Bonus] Additional Measurements
+Collected additional measurement(s) and reflected them in A3-2
+5pt
+
+[Bonus] Statistical Tests
+Conduct statistical test(s) on the measurement(s) comparing the two conditions.
+5pt
+
+[Bonus] Literature Review
+Literature review on what additional interface features may improve AI-asssited task
+5pt

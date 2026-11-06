@@ -1,0 +1,182 @@
+"""Geolocation study: participants label random photos, with or without AI suggestions."""
+import csv
+import random
+import uuid
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+import attention
+import db
+import gemini
+
+ROOT = Path(__file__).parent
+IMAGE_DIR = ROOT / "images"
+TRIALS_PER_COUNTRY = 4
+N_TRIALS = TRIALS_PER_COUNTRY * len(gemini.COUNTRIES)
+with open(ROOT / "images.csv", newline="") as f:
+    TRUTH = {row["image_id"]: row["country"] for row in csv.DictReader(f)}
+BY_COUNTRY = {c: sorted(i for i, country in TRUTH.items() if country == c) for c in gemini.COUNTRIES}
+
+
+@asynccontextmanager
+async def lifespan(_):
+    db.init()
+    yield
+
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+app.mount("/images", StaticFiles(directory=IMAGE_DIR), name="images")
+
+
+class NewSession(BaseModel):
+    ai_assist: bool
+
+
+class CheckAnswer(BaseModel):
+    check_index: int = Field(ge=0)
+    answer: str = Field(max_length=200)
+
+
+class Answer(BaseModel):
+    trial_index: int = Field(ge=0)
+    response: str
+    expanded_other: bool = False
+    rt_ms: int = Field(ge=0, le=3_600_000)
+
+
+class Survey(BaseModel):
+    confidence: int = Field(ge=1, le=7)
+    mental_demand: int = Field(ge=1, le=7)
+    geo_knowledge: int = Field(ge=1, le=7)
+    seen_other_condition: bool
+    trust: int | None = Field(None, ge=1, le=7)
+    usefulness: int | None = Field(None, ge=1, le=7)
+    free_text: str = Field("", max_length=5000)
+
+
+def image_order(participant_id):
+    """A random draw per participant, balanced across countries. Seeded by id, so a refresh keeps the same trials."""
+    rng = random.Random(participant_id)
+    images = [image for c in gemini.COUNTRIES for image in rng.sample(BY_COUNTRY[c], TRIALS_PER_COUNTRY)]
+    rng.shuffle(images)
+    return images
+
+
+def participant(participant_id):
+    found = db.get_participant(participant_id)
+    if not found:
+        raise HTTPException(404, "unknown participant")
+    return {**found, "terminated": found["check_failures"] >= attention.MAX_FAILURES}
+
+
+def active_participant(participant_id):
+    state = participant(participant_id)
+    if state["terminated"]:
+        raise HTTPException(409, "session ended by attention checks")
+    return state
+
+
+def session_view(participant_id):
+    """Everything the browser needs to decide its next screen. The server owns the flow."""
+    state = participant(participant_id)
+    due = attention.due_index(state)
+    return {"participant_id": participant_id, **state, "countries": gemini.COUNTRIES,
+            "attention_check": None if due is None else attention.view(due),
+            "images": [f"/images/{image_id}.jpg" for image_id in image_order(participant_id)]}
+
+
+@app.get("/")
+def index():
+    return FileResponse(ROOT / "static/index.html")
+
+
+@app.post("/api/sessions")
+def create_session(req: NewSession):
+    participant_id = uuid.uuid4().hex
+    db.add_participant(participant_id, req.ai_assist)
+    return session_view(participant_id)
+
+
+@app.get("/api/sessions/{participant_id}")
+def get_session(participant_id: str):
+    return session_view(participant_id)
+
+
+@app.post("/api/sessions/{participant_id}/attention")
+def submit_attention(participant_id: str, req: CheckAnswer):
+    state = participant(participant_id)
+    if req.check_index < state["checks_done"]:  # a retry of a saved answer
+        return {**session_view(participant_id), "passed": None}
+    if state["terminated"] or req.check_index != attention.due_index(state):
+        raise HTTPException(409, "this check is not due")
+    if req.answer not in attention.CHECKS[req.check_index]["options"]:
+        raise HTTPException(422, "answer is not one of the options")
+    passed = attention.is_correct(req.check_index, req.answer)
+    db.add_attention_check(participant_id, req.check_index, req.answer, passed)
+    return {**session_view(participant_id), "passed": passed}
+
+
+@app.get("/api/sessions/{participant_id}/ai/{trial_index}")
+def get_ai(participant_id: str, trial_index: int):
+    if not active_participant(participant_id)["ai_assist"]:
+        raise HTTPException(403, "this participant is in the no-AI condition")
+    order = image_order(participant_id)
+    if not 0 <= trial_index < len(order):
+        raise HTTPException(404, "no such trial")
+    image_id = order[trial_index]
+    cached = db.get_ai_output(image_id)
+    if cached:
+        return cached
+    try:
+        suggestions = gemini.suggest(IMAGE_DIR / f"{image_id}.jpg")
+    except gemini.GeminiUnavailable:
+        raise HTTPException(503, "AI suggestions are unavailable, please retry")
+    return db.save_ai_output(image_id, suggestions, gemini.MODEL_LABEL)
+
+
+@app.post("/api/sessions/{participant_id}/responses")
+def submit_response(participant_id: str, req: Answer):
+    state = participant(participant_id)
+    if req.trial_index < state["done"]:  # a retry of a saved answer
+        return session_view(participant_id)
+    if state["terminated"] or attention.due_index(state) is not None:
+        raise HTTPException(409, "an attention check comes first")
+    if req.trial_index > state["done"] or req.trial_index >= N_TRIALS:
+        raise HTTPException(409, f"expected trial {state['done']}")
+    if req.response not in gemini.COUNTRIES:
+        raise HTTPException(422, "response is not one of the countries")
+    image_id = image_order(participant_id)[req.trial_index]
+    truth = TRUTH[image_id]
+    chose_rank = ai_top1 = ai_top1_correct = None
+    if state["ai_assist"]:
+        shown = db.get_ai_output(image_id)
+        if not shown:
+            raise HTTPException(409, "AI suggestions were not shown for this trial")
+        ranked = [s["country"] for s in shown]
+        chose_rank = ranked.index(req.response) + 1 if req.response in ranked else 0
+        if chose_rank == 0 and not req.expanded_other:
+            raise HTTPException(422, "choosing outside the AI's suggestions requires 'None of these'")
+        ai_top1, ai_top1_correct = ranked[0], int(ranked[0] == truth)
+    elif req.expanded_other:
+        raise HTTPException(422, "the no-AI condition has no 'None of these'")
+    db.add_response(participant_id, req.trial_index, image_id, state["ai_assist"], req.response, req.response == truth,
+                    chose_rank, req.expanded_other, ai_top1, ai_top1_correct, req.rt_ms)
+    return session_view(participant_id)
+
+
+@app.post("/api/sessions/{participant_id}/survey")
+def submit_survey(participant_id: str, req: Survey):
+    state = active_participant(participant_id)
+    if state["done"] < N_TRIALS:
+        raise HTTPException(409, "trials not finished")
+    if state["ai_assist"] != (req.trust is not None) or state["ai_assist"] != (req.usefulness is not None):
+        raise HTTPException(422, "trust and usefulness are asked only in the AI condition")
+    db.add_survey(participant_id, req.confidence, req.mental_demand, req.geo_knowledge, req.seen_other_condition,
+                  req.trust, req.usefulness, req.free_text)
+    return session_view(participant_id)
