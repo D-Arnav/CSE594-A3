@@ -68,6 +68,16 @@ def image_order(participant_id):
     return images
 
 
+def image_url(image_id):
+    return f"/images/{image_id}.jpg"
+
+
+def attention_image(participant_id, index):
+    """A random photo outside the participant's trials, so a check adds no exposure to a scored photo."""
+    others = sorted(set(TRUTH) - set(image_order(participant_id)))
+    return random.Random(f"{participant_id}-check-{index}").choice(others)
+
+
 def participant(participant_id):
     found = db.get_participant(participant_id)
     if not found:
@@ -87,8 +97,8 @@ def session_view(participant_id):
     state = participant(participant_id)
     due = attention.due_index(state)
     return {"participant_id": participant_id, **state, "countries": gemini.COUNTRIES,
-            "attention_check": None if due is None else attention.view(due),
-            "images": [f"/images/{image_id}.jpg" for image_id in image_order(participant_id)]}
+            "attention_check": None if due is None else attention.view(due, image_url(attention_image(participant_id, due))),
+            "images": [image_url(image_id) for image_id in image_order(participant_id)]}
 
 
 @app.get("/")

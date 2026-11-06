@@ -105,6 +105,13 @@ def test_attention(client):
     while not s["attention_check"]:
         s = answer_trial(client, base, s)
     assert s["done"] == attention.CHECKS[0]["after_trial"] and "answer" not in s["attention_check"]
+
+    # the check shows a real photo outside this participant's trials, the same one after a refresh
+    assert s["attention_check"]["image"] not in s["images"]
+    assert status(client.get(base), 200)["attention_check"] == s["attention_check"]
+    assert client.get(s["attention_check"]["image"]).status_code == 200
+    assert s["attention_check"]["question"] == "Select South Korea."
+
     status(client.post(f"{base}/responses", json={"trial_index": s["done"], "response": "Japan", "rt_ms": 10}), 409)
     status(client.post(f"{base}/attention", json={"check_index": 1, "answer": "Germany"}), 409)
     status(client.post(f"{base}/attention", json={"check_index": 0, "answer": "Mars"}), 422)

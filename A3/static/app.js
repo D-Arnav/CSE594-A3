@@ -103,26 +103,22 @@ function next() {
 }
 
 function attentionCheck(check) {
-  let answer = null;
-  const err = h("p", {className: "err", role: "alert"});
-  const submit = h("button", {className: "primary", textContent: "Continue", disabled: true, async onclick() {
-    this.disabled = true;
-    try {
+  const screen = photoScreen({
+    src: check.image,
+    label: "Quick check",
+    position: session.done,
+    preload: session.images[session.done],
+    async onNext(answer) {
       const {passed, ...updated} = await api(sessionPath("/attention"), {check_index: check.index, answer});
       session = updated;
       passed === false && !session.terminated ? attentionWarning() : next();
-    } catch {
-      err.textContent = "Could not save your answer. Check your connection and try again.";
-      this.disabled = false;
-    }
-  }});
-  const options = check.options.map(option => h("button", {className: "opt", textContent: option, ariaPressed: "false", onclick() {
-    answer = option;
-    options.forEach(b => { b.ariaPressed = String(b === this); });
-    submit.disabled = false;
-  }}));
-  page(h("h1", {}, "Quick check"), h("p", {className: "lead"}, check.question),
-       h("div", {className: "check-options"}, options), err, submit);
+    },
+  });
+  screen.photoLoaded.then(() => {
+    screen.choices.classList.add("unaided");
+    screen.choices.replaceChildren(h("p", {className: "q"}, check.question),
+                                   ...check.options.map((c, i) => screen.option(c, i + 1)));
+  }, () => { screen.err.textContent = "Could not load the photo. Reload the page."; });
 }
 
 function attentionWarning() {
@@ -140,11 +136,11 @@ function terminated() {
        }}));
 }
 
-function trial(index) {
+// The screen shared by trials and attention checks: photo with zoom, answer panel, Next, and keyboard shortcuts.
+function photoScreen({src, label, position, preload, onNext}) {
   const total = session.images.length;
-  let selected = null, startedAt = performance.now(), busy = false, expandedOther = false;
+  let selected = null, busy = false;
 
-  const src = session.images[index];
   const img = h("img", {className: "photo", alt: "Street-level photo to locate", draggable: false});
   const level = h("span", {className: "zoom-level", ariaLive: "polite", textContent: "100%"});
   const zoomOutBtn = h("button", {className: "zoom-step", textContent: "−", ariaLabel: "Zoom out", disabled: true});
@@ -189,6 +185,66 @@ function trial(index) {
       kids.slice(1));
   }
 
+  function clearSelection() {
+    selected = null;
+    nextBtn.disabled = true;
+  }
+
+  async function submit() {
+    if (!selected || busy) return;
+    busy = nextBtn.disabled = true;
+    try {
+      await onNext(selected);
+    } catch {
+      err.textContent = "Could not save your answer. Check your connection and press Next again.";
+      busy = nextBtn.disabled = false;
+    }
+  }
+
+  app.replaceChildren(h("main", {className: "trial"},
+    h("header", {className: "topbar"},
+      h("div", {className: "count"}, label),
+      route(position, total)),
+    h("div", {className: "workspace"},
+      h("div", {className: "stage-frame"}, stage),
+      h("section", {className: "rail", ariaLabel: "Your answer"},
+        choices,
+        h("div", {className: "rail-foot"}, err, nextBtn,
+          h("div", {className: "keys"}, "Press a number to choose, Enter to continue"))))));
+  document.onkeydown = e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "+" || e.key === "=") zoom.zoomIn();
+    else if (e.key === "-") zoom.zoomOut();
+    else if (e.key === "0") zoom.reset();
+    else if (/^[1-9]$/.test(e.key)) {
+      document.activeElement.blur();
+      choices.querySelectorAll(".opt")[+e.key - 1]?.click();
+    }
+    // Enter submits, except on a non-choice button or an unselected choice (those handle Enter natively)
+    else if (e.key === "Enter" && !e.target.closest?.("button:not(.opt), .opt[aria-pressed=false]")) {
+      e.preventDefault();
+      submit();
+    }
+  };
+  if (preload) new Image().src = preload;
+  return {photoLoaded, choices, err, option, clearSelection};
+}
+
+function trial(index) {
+  let startedAt = performance.now(), expandedOther = false;
+  const screen = photoScreen({
+    src: session.images[index],
+    label: [`Photo ${index + 1} `, h("span", {}, `of ${session.images.length}`)],
+    position: index,
+    preload: session.images[index + 1],
+    async onNext(response) {
+      const rt_ms = Math.min(3600000, Math.round(performance.now() - startedAt));
+      session = await api(sessionPath("/responses"), {trial_index: index, response, expanded_other: expandedOther, rt_ms});
+      next();
+    },
+  });
+  const {choices, err, option, photoLoaded} = screen;
+
   async function loadUnaided() {
     try {
       await photoLoaded;
@@ -218,8 +274,7 @@ function trial(index) {
       ...(expandedOther ? [h("div", {className: "other-options"}, rest.map((c, i) => option(c, cards.length + i + 1)))]
                         : [h("button", {className: "text-button", textContent: "None of these — choose another", onclick() {
                             expandedOther = true;
-                            selected = null;
-                            nextBtn.disabled = true;
+                            screen.clearSelection();
                             renderCards(cards);
                           }})]));
   }
@@ -240,45 +295,6 @@ function trial(index) {
     }
   }
 
-  async function submit() {
-    if (!selected || busy) return;
-    busy = nextBtn.disabled = true;
-    try {
-      const rt_ms = Math.min(3600000, Math.round(performance.now() - startedAt));
-      session = await api(sessionPath("/responses"), {trial_index: index, response: selected, expanded_other: expandedOther, rt_ms});
-      next();
-    } catch {
-      err.textContent = "Could not save your answer. Check your connection and press Next again.";
-      busy = nextBtn.disabled = false;
-    }
-  }
-
-  app.replaceChildren(h("main", {className: "trial"},
-    h("header", {className: "topbar"},
-      h("div", {className: "count"}, `Photo ${index + 1} `, h("span", {}, `of ${total}`)),
-      route(index, total)),
-    h("div", {className: "workspace"},
-      h("div", {className: "stage-frame"}, stage),
-      h("section", {className: "rail", ariaLabel: "Your answer"},
-        choices,
-        h("div", {className: "rail-foot"}, err, nextBtn,
-          h("div", {className: "keys"}, "Press a number to choose, Enter to continue"))))));
-  document.onkeydown = e => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === "+" || e.key === "=") zoom.zoomIn();
-    else if (e.key === "-") zoom.zoomOut();
-    else if (e.key === "0") zoom.reset();
-    else if (/^[1-9]$/.test(e.key)) {
-      document.activeElement.blur();
-      choices.querySelectorAll(".opt")[+e.key - 1]?.click();
-    }
-    // Enter submits, except on a non-choice button or an unselected choice (those handle Enter natively)
-    else if (e.key === "Enter" && !e.target.closest?.("button:not(.opt), .opt[aria-pressed=false]")) {
-      e.preventDefault();
-      submit();
-    }
-  };
-  if (session.images[index + 1]) new Image().src = session.images[index + 1];  // preload
   session.ai_assist ? loadCards() : loadUnaided();
 }
 
