@@ -2,4 +2,3 @@ fastapi==0.162.0
 uvicorn==0.54.0
 google-genai==2.34.0
 libsql==0.1.11
-pillow==13.0.0

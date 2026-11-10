@@ -3,9 +3,9 @@ from gemini import COUNTRIES
 
 MAX_FAILURES = 2  # tolerant by design: one slip earns a warning, a second ends the session
 CHECKS = [
-    {"after_trial": 7, "question": "Select South Korea.",
+    {"after_trial": 13, "question": "Select South Korea.",
      "options": COUNTRIES, "answer": "South Korea"},
-    {"after_trial": 14, "question": "Select Germany.",
+    {"after_trial": 26, "question": "Select Germany.",
      "options": COUNTRIES, "answer": "Germany"},
 ]
 

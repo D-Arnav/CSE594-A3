@@ -1,26 +1,22 @@
 """Synchronous AI suggestions from the Gemini API."""
 import base64
-import io
 import time
 from functools import lru_cache
 from typing import Literal, get_args
 
 from google import genai
-from PIL import Image
 from pydantic import BaseModel, Field, field_validator
 
 import env  # noqa: F401  (loads .env)
 
-MODEL = "gemini-3.1-flash-lite"  # cheapest free-tier vision model; the study does not need a strong one
-DOWNSCALE = 8  # the AI sees photos at 1/8 width and height, which handicaps it; participants see the originals
-MODEL_LABEL = f"{MODEL} at 1/{DOWNSCALE} scale"
+MODEL = "gemini-3.1-flash-lite"  # cheapest free-tier vision model
 Country = Literal["United States", "Germany", "Japan", "South Korea", "India"]
 COUNTRIES = list(get_args(Country))
-ATTEMPTS = 3
-TIMEOUT_MS = 30_000
+ATTEMPTS = 2  # after this the trial falls back to SmolVLM2, so a participant is never stuck
+TIMEOUT_MS = 20_000
 PROMPT = (f"This street-level photo was taken in exactly one of: {', '.join(COUNTRIES)}. "
           "Return your three most likely countries, most likely first. For each, give the probability it is correct "
-          "and one short sentence naming specific things visible in the photo that support it.")
+          "and one sentence of at most 15 words naming specific things visible in the photo that support it.")
 
 
 class Suggestion(BaseModel):
@@ -50,18 +46,9 @@ def client():
     return genai.Client(http_options={"timeout": TIMEOUT_MS})  # reads GEMINI_API_KEY
 
 
-def downscaled_jpeg(image_path):
-    with Image.open(image_path) as photo:
-        size = (max(1, photo.width // DOWNSCALE), max(1, photo.height // DOWNSCALE))
-        small = photo.convert("RGB").resize(size, Image.Resampling.LANCZOS)
-    buffer = io.BytesIO()
-    small.save(buffer, "JPEG", quality=90)
-    return buffer.getvalue()
-
-
 def suggest(image_path, attempts=ATTEMPTS):
     """-> [{"country", "p", "rationale"}] x 3, ranked. Raises GeminiUnavailable once retries are used up."""
-    image = base64.b64encode(downscaled_jpeg(image_path)).decode()
+    image = base64.b64encode(image_path.read_bytes()).decode()
     for attempt in range(attempts):
         try:
             interaction = client().interactions.create(

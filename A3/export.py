@@ -6,7 +6,7 @@ from pathlib import Path
 import db
 
 OUT = Path(__file__).parent / "exports"
-TABLES = ("participants", "attention_checks", "responses", "surveys", "ai_outputs")
+TABLES = ("participants", "attention_checks", "trials", "surveys", "ai_shown")
 
 OUT.mkdir(exist_ok=True)
 with closing(db.connect()) as conn:

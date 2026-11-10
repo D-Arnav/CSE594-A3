@@ -1,4 +1,7 @@
-"""Geolocation study: participants label random photos, with or without AI suggestions."""
+"""Geolocation study: participants label random photos, with or without AI suggestions.
+
+In the AI condition, a fixed share of each session's trials calls Gemini live; the rest show SmolVLM2's suggestions
+from Assignment 2. The source of every trial is logged."""
 import csv
 import random
 import re
@@ -13,12 +16,15 @@ from pydantic import BaseModel, Field, field_validator
 import attention
 import db
 import gemini
+import smolvlm
 
 ROOT = Path(__file__).parent
 IMAGE_DIR = ROOT / "images"
-TRIALS_PER_COUNTRY = 4
+TRIALS_PER_COUNTRY = 8
+GEMINI_SHARE = 0.2  # of each AI session's trials
 UNIQNAME = re.compile(r"[a-z]{3,8}")  # U-M uniqnames are 3 to 8 letters
 N_TRIALS = TRIALS_PER_COUNTRY * len(gemini.COUNTRIES)
+N_GEMINI = round(N_TRIALS * GEMINI_SHARE)
 with open(ROOT / "images.csv", newline="") as f:
     TRUTH = {row["image_id"]: row["country"] for row in csv.DictReader(f)}
 BY_COUNTRY = {c: sorted(i for i, country in TRUTH.items() if country == c) for c in gemini.COUNTRIES}
@@ -76,6 +82,11 @@ def image_order(participant_id):
     images = [image for c in gemini.COUNTRIES for image in rng.sample(BY_COUNTRY[c], TRIALS_PER_COUNTRY)]
     rng.shuffle(images)
     return images
+
+
+def gemini_trials(participant_id):
+    """Which trial indices call Gemini live: a random set of N_GEMINI, seeded by id so a refresh keeps it."""
+    return set(random.Random(f"{participant_id}-gemini").sample(range(N_TRIALS), N_GEMINI))
 
 
 def image_url(image_id):
@@ -159,15 +170,17 @@ def get_ai(participant_id: str, trial_index: int):
     order = image_order(participant_id)
     if not 0 <= trial_index < len(order):
         raise HTTPException(404, "no such trial")
+    shown = db.get_ai_shown(participant_id, trial_index)
+    if shown:
+        return shown["suggestions"]
     image_id = order[trial_index]
-    cached = db.get_ai_output(image_id)
-    if cached:
-        return cached
-    try:
-        suggestions = gemini.suggest(IMAGE_DIR / f"{image_id}.jpg")
-    except gemini.GeminiUnavailable:
-        raise HTTPException(503, "AI suggestions are unavailable, please retry")
-    return db.save_ai_output(image_id, suggestions, gemini.MODEL_LABEL)
+    source, suggestions = "smolvlm", smolvlm.suggest(image_id)
+    if trial_index in gemini_trials(participant_id):
+        try:
+            source, suggestions = "gemini", gemini.suggest(IMAGE_DIR / f"{image_id}.jpg")
+        except gemini.GeminiUnavailable:
+            source = "smolvlm_fallback"  # Gemini failed after retries; keep the participant moving and log it
+    return db.save_ai_shown(participant_id, trial_index, image_id, source, suggestions)["suggestions"]
 
 
 @app.post("/api/sessions/{participant_id}/responses")
@@ -183,20 +196,21 @@ def submit_response(participant_id: str, req: Answer):
         raise HTTPException(422, "response is not one of the countries")
     image_id = image_order(participant_id)[req.trial_index]
     truth = TRUTH[image_id]
-    chose_rank = ai_top1 = ai_top1_correct = None
+    chose_rank = ai_source = ai_top1 = ai_top1_correct = None
     if state["ai_assist"]:
-        shown = db.get_ai_output(image_id)
+        shown = db.get_ai_shown(participant_id, req.trial_index)
         if not shown:
             raise HTTPException(409, "AI suggestions were not shown for this trial")
-        ranked = [s["country"] for s in shown]
+        ai_source = shown["source"]
+        ranked = [s["country"] for s in shown["suggestions"]]
         chose_rank = ranked.index(req.response) + 1 if req.response in ranked else 0
         if chose_rank == 0 and not req.expanded_other:
             raise HTTPException(422, "choosing outside the AI's suggestions requires 'None of these'")
         ai_top1, ai_top1_correct = ranked[0], int(ranked[0] == truth)
     elif req.expanded_other:
         raise HTTPException(422, "the no-AI condition has no 'None of these'")
-    db.add_response(participant_id, req.trial_index, image_id, state["ai_assist"], req.response, req.response == truth,
-                    chose_rank, req.expanded_other, ai_top1, ai_top1_correct, req.rt_ms)
+    db.add_trial(participant_id, req.trial_index, image_id, state["ai_assist"], req.response, req.response == truth,
+                 chose_rank, req.expanded_other, ai_source, ai_top1, ai_top1_correct, req.rt_ms)
     return session_view(participant_id)
 
 

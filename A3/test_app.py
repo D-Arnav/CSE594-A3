@@ -1,6 +1,5 @@
 """End-to-end check of both conditions with Gemini stubbed: python test_app.py"""
 import base64
-import io
 import os
 import tempfile
 from collections import Counter
@@ -8,8 +7,6 @@ from itertools import product
 from string import ascii_lowercase
 from pathlib import Path
 from unittest import mock
-
-from PIL import Image
 
 import db
 
@@ -22,6 +19,7 @@ import app as study
 import attention
 import env
 import gemini
+import smolvlm
 
 CARDS = [{"country": c, "p": p, "rationale": "A visible clue."}
          for c, p in zip(("Japan", "Germany", "India"), (0.6, 0.3, 0.1))]
@@ -65,37 +63,58 @@ def test_no_ai_flow(client):
 
 def test_ai_flow(client):
     s, base = new_session(client, True)
+    images = [Path(url).stem for url in s["images"]]
+    live = study.gemini_trials(s["participant_id"])
+    assert len(live) == study.N_GEMINI == round(0.2 * study.N_TRIALS) and live <= set(range(study.N_TRIALS))
 
-    # answering before the AI ran is refused; one Gemini call per photo across participants
+    # answering before the AI ran is refused
     status(client.post(f"{base}/responses", json={"trial_index": 0, "response": "Japan", "rt_ms": 10}), 409)
+
+    # Gemini trials call Gemini live; the rest show SmolVLM2's A2 output; a refresh shows the logged output again
     with mock.patch.object(gemini, "suggest", return_value=CARDS) as call:
-        assert status(client.get(f"{base}/ai/0"), 200) == CARDS
-        status(client.get(f"{base}/ai/0"), 200)
-        assert call.call_count == 1
+        shown = [status(client.get(f"{base}/ai/{i}"), 200) for i in range(study.N_TRIALS)]
+        assert call.call_count == len(live)
+        assert [status(client.get(f"{base}/ai/{i}"), 200) for i in range(study.N_TRIALS)] == shown
+        assert call.call_count == len(live)
+    for i, cards in enumerate(shown):
+        assert cards == (CARDS if i in live else smolvlm.suggest(images[i])), i
     status(client.get(f"{base}/ai/999"), 404)
+
+    # every participant's Gemini trials are live calls, never reused from someone else
+    other, other_base = new_session(client, True)
+    with mock.patch.object(gemini, "suggest", return_value=CARDS) as call:
+        for i in range(study.N_TRIALS):
+            status(client.get(f"{other_base}/ai/{i}"), 200)
+        assert call.call_count == study.N_GEMINI
 
     # ordering, label space, and retry of a saved answer
     status(client.post(f"{base}/responses", json={"trial_index": 5, "response": "Japan", "rt_ms": 10}), 409)
     status(client.post(f"{base}/responses", json={"trial_index": 0, "response": "Mars", "rt_ms": 10}), 422)
-    s = answer_trial(client, base, s, "Germany")
-    assert status(client.post(f"{base}/responses", json={"trial_index": 0, "response": "India", "rt_ms": 10}), 200)["done"] == 1
+    second = shown[0][1]["country"]
+    s = answer_trial(client, base, s, second)
+    assert status(client.post(f"{base}/responses", json={"trial_index": 0, "response": shown[0][0]["country"], "rt_ms": 10}), 200)["done"] == 1
 
     # leaving the AI's suggestions requires expanding; a card chosen after expanding keeps its rank
-    with mock.patch.object(gemini, "suggest", return_value=CARDS):
-        status(client.get(f"{base}/ai/1"), 200)
-        status(client.get(f"{base}/ai/2"), 200)
-    status(client.post(f"{base}/responses", json={"trial_index": 1, "response": OTHER, "rt_ms": 10}), 422)
-    s = answer_trial(client, base, s, OTHER, expanded_other=True)
-    s = answer_trial(client, base, s, "Japan", expanded_other=True)
+    outside = next(c for c in gemini.COUNTRIES if c not in {card["country"] for card in shown[1]})
+    status(client.post(f"{base}/responses", json={"trial_index": 1, "response": outside, "rt_ms": 10}), 422)
+    s = answer_trial(client, base, s, outside, expanded_other=True)
+    s = answer_trial(client, base, s, shown[2][0]["country"], expanded_other=True)
 
     with db.closing(db.connect()) as conn:
-        rows = conn.execute("""SELECT response, chose_rank, expanded_other, ai_top1 FROM responses
+        rows = conn.execute("""SELECT response, chose_rank, expanded_other, ai_source, ai_top1 FROM trials
                                WHERE participant_id = ? ORDER BY trial_index""", (s["participant_id"],)).fetchall()
-    assert rows == [("Germany", 2, 0, "Japan"), (OTHER, 0, 1, "Japan"), ("Japan", 1, 1, "Japan")], rows
+    source = lambda i: "gemini" if i in live else "smolvlm"  # noqa: E731
+    assert rows == [(second, 2, 0, source(0), shown[0][0]["country"]),
+                    (outside, 0, 1, source(1), shown[1][0]["country"]),
+                    (shown[2][0]["country"], 1, 1, source(2), shown[2][0]["country"])], rows
 
-    # Gemini failure surfaces as a retryable 503
+    # a Gemini failure falls back to SmolVLM2 so the participant isn't stuck, and the fallback is logged
+    failing, failing_base = new_session(client, True)
+    first_live = min(study.gemini_trials(failing["participant_id"]))
     with mock.patch.object(gemini, "suggest", side_effect=gemini.GeminiUnavailable("x")):
-        status(client.get(f"{base}/ai/3"), 503)
+        fallback = status(client.get(f"{failing_base}/ai/{first_live}"), 200)
+    assert fallback == smolvlm.suggest(Path(failing["images"][first_live]).stem)
+    assert db.get_ai_shown(failing["participant_id"], first_live)["source"] == "smolvlm_fallback"
     status(client.post(f"{base}/survey", json={**SURVEY, "trust": 4, "usefulness": 4}), 409)
 
 
@@ -193,6 +212,14 @@ def test_env_file():
     env.load(path.with_name("missing.env"))
 
 
+def test_smolvlm_outputs():
+    assert set(smolvlm.OUTPUTS) == set(study.TRUTH)
+    for image_id, cards in smolvlm.OUTPUTS.items():
+        countries, ps = [c["country"] for c in cards], [c["p"] for c in cards]
+        assert len(set(countries)) == 3 and set(countries) <= set(gemini.COUNTRIES), image_id
+        assert ps == sorted(ps, reverse=True) and all(0 <= p <= 1 for p in ps) and all(c["rationale"] for c in cards), image_id
+
+
 def test_validation():
     good = {"suggestions": CARDS}
     assert [s.country for s in gemini.Suggestions.model_validate(good).suggestions] == ["Japan", "Germany", "India"]
@@ -211,10 +238,9 @@ def test_retries():
         client.return_value.interactions.create.side_effect = [bad, ok]
         assert gemini.suggest(path)[0]["country"] == "Japan"
 
-        # the AI receives the photo at 1/8 scale; the file participants see is untouched
+        # Gemini receives the same photo file participants see
         sent = client.return_value.interactions.create.call_args.kwargs["input"][1]["data"]
-        with Image.open(io.BytesIO(base64.b64decode(sent))) as small, Image.open(path) as original:
-            assert small.size == (original.width // gemini.DOWNSCALE, original.height // gemini.DOWNSCALE)
+        assert base64.b64decode(sent) == path.read_bytes()
 
         client.return_value.interactions.create.side_effect = [bad] * gemini.ATTEMPTS
         try:
@@ -232,6 +258,7 @@ if __name__ == "__main__":
         test_uniqname(client)
         test_random_trials(client)
     test_env_file()
+    test_smolvlm_outputs()
     test_validation()
     test_retries()
     print("ok")
