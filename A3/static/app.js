@@ -120,6 +120,7 @@ function attentionCheck(check) {
   const screen = photoScreen({
     src: check.image,
     label: "Quick check",
+    callout: check.question,
     position: session.done,
     preload: session.images[session.done],
     async onNext(answer) {
@@ -151,7 +152,7 @@ function terminated() {
 }
 
 // The screen shared by trials and attention checks: photo with zoom, answer panel, Next, and keyboard shortcuts.
-function photoScreen({src, label, position, preload, onNext}) {
+function photoScreen({src, label, callout, position, preload, onNext}) {
   const total = session.images.length;
   let selected = null, busy = false;
 
@@ -161,6 +162,8 @@ function photoScreen({src, label, position, preload, onNext}) {
   const zoomInBtn = h("button", {className: "zoom-step", textContent: "+", ariaLabel: "Zoom in"});
   const fitBtn = h("button", {textContent: "Fit", ariaLabel: "Fit photo to frame", disabled: true});
   const stage = h("div", {className: "stage"}, img,
+    // the panel already says this to screen readers, so the copy on the photo is visual only
+    callout ? h("div", {className: "stage-callout", ariaHidden: "true"}, callout) : null,
     h("div", {className: "zoom-hint"}, "Scroll to zoom, drag to move"),
     h("div", {className: "zoom-controls"}, zoomOutBtn, level, zoomInBtn, fitBtn));
   const zoom = attachZoom(stage, img, scale => {
