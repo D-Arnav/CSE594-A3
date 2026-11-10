@@ -37,6 +37,7 @@ TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... python export.py   # writes exports/
 ## Design decisions
 
 - **Photos:** each participant gets a random draw of 20 from the 200 A2 study photos, balanced at 4 per country so no country dominates a session. The draw is seeded by participant ID, so a refresh keeps the same trials. `TRIALS_PER_COUNTRY` in `app.py` controls this.
+- **Participant ID:** participants enter their U-M uniqname. The ID is uniqname plus condition (`jsmith-ai`, `jsmith-noai`), so one person's two sessions can be paired: `participant_id.split("-")[0]` gives the uniqname, and `created_at` shows which condition came first. Entering the same uniqname on the same link resumes that session. A session ended by attention checks keeps its data, and starting over creates `jsmith-ai-2`. Uniqnames identify people, so remove or replace them before sharing data outside the course.
 - **Assignment:** the link sets the condition, and the server stores it.
 - **Attention checks:** after photos 7 and 14, the usual photo screen shows a random photo outside the participant's 20, with "Select South Korea." or "Select Germany." in place of the question and no AI suggestions (see `attention.py`). The first miss shows a warning and a reminder. Missing both ends the session, and the participant starts over as a new participant. Answers stay on the server, and the server won't accept the next trial until a due check is answered.
 - **Synchronous AI:** when a photo first appears, the server calls Gemini while the participant waits. The first output per photo is stored and reused, so all participants see identical suggestions and the study uses at most 200 API calls.
@@ -58,4 +59,4 @@ TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... python export.py   # writes exports/
 
 **Valid participants for analysis:** those with a row in `surveys`. A session ended by attention checks never reaches the survey, but its partial data stays for transparency. A participant who missed one check can still finish; `attention_checks` identifies them.
 
-Confidence and mental demand are asked in both conditions, so they can be compared directly, along with response time. `seen_other_condition` lets analysis account for order effects, since classmates complete both versions.
+Confidence and mental demand are asked in both conditions, so they can be compared directly, along with response time. Order effects can be read from the data, since uniqname pairing and `created_at` show which condition each person did first. `seen_other_condition` (self-reported) cross-checks it.

@@ -60,7 +60,8 @@ def init():
 
 
 def add_participant(participant_id, ai_assist):
-    _write("INSERT INTO participants VALUES (?, ?, ?)", (participant_id, int(ai_assist), now()))
+    # IGNORE: a double click on start creates one session, not an error
+    _write("INSERT OR IGNORE INTO participants VALUES (?, ?, ?)", (participant_id, int(ai_assist), now()))
 
 
 def get_participant(participant_id):

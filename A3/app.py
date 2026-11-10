@@ -1,14 +1,14 @@
 """Geolocation study: participants label random photos, with or without AI suggestions."""
 import csv
 import random
-import uuid
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 import attention
 import db
@@ -17,6 +17,7 @@ import gemini
 ROOT = Path(__file__).parent
 IMAGE_DIR = ROOT / "images"
 TRIALS_PER_COUNTRY = 4
+UNIQNAME = re.compile(r"[a-z]{3,8}")  # U-M uniqnames are 3 to 8 letters
 N_TRIALS = TRIALS_PER_COUNTRY * len(gemini.COUNTRIES)
 with open(ROOT / "images.csv", newline="") as f:
     TRUTH = {row["image_id"]: row["country"] for row in csv.DictReader(f)}
@@ -36,6 +37,15 @@ app.mount("/images", StaticFiles(directory=IMAGE_DIR), name="images")
 
 class NewSession(BaseModel):
     ai_assist: bool
+    uniqname: str = Field(max_length=100)
+
+    @field_validator("uniqname")
+    @classmethod
+    def normalize_uniqname(cls, value):
+        value = value.strip().lower().removesuffix("@umich.edu")
+        if not UNIQNAME.fullmatch(value):
+            raise ValueError("a uniqname is 3 to 8 letters")
+        return value
 
 
 class CheckAnswer(BaseModel):
@@ -108,9 +118,19 @@ def index():
 
 @app.post("/api/sessions")
 def create_session(req: NewSession):
-    participant_id = uuid.uuid4().hex
-    db.add_participant(participant_id, req.ai_assist)
-    return session_view(participant_id)
+    """Resume this uniqname's session in this condition, or start one. The id is uniqname plus condition, e.g.
+    jsmith-ai; a session ended by attention checks makes the next attempt jsmith-ai-2, and so on."""
+    base = f"{req.uniqname}-{'ai' if req.ai_assist else 'noai'}"
+    attempt = 1
+    while True:
+        participant_id = base if attempt == 1 else f"{base}-{attempt}"
+        found = db.get_participant(participant_id)
+        if found is None:
+            db.add_participant(participant_id, req.ai_assist)
+            return session_view(participant_id)
+        if found["check_failures"] < attention.MAX_FAILURES:
+            return session_view(participant_id)
+        attempt += 1
 
 
 @app.get("/api/sessions/{participant_id}")

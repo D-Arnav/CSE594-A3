@@ -4,6 +4,8 @@ import io
 import os
 import tempfile
 from collections import Counter
+from itertools import product
+from string import ascii_lowercase
 from pathlib import Path
 from unittest import mock
 
@@ -32,8 +34,11 @@ def status(response, expected):
     return response.json()
 
 
-def new_session(client, ai_assist):
-    s = status(client.post("/api/sessions", json={"ai_assist": ai_assist}), 200)
+UNIQNAMES = ("".join(letters) for letters in product(ascii_lowercase, repeat=4))
+
+
+def new_session(client, ai_assist, uniqname=None):
+    s = status(client.post("/api/sessions", json={"ai_assist": ai_assist, "uniqname": uniqname or next(UNIQNAMES)}), 200)
     return s, f"/api/sessions/{s['participant_id']}"
 
 
@@ -137,8 +142,29 @@ def test_attention(client):
     status(client.post(f"{base}/responses", json={"trial_index": s["done"], "response": "Japan", "rt_ms": 10}), 409)
     status(client.post(f"{base}/attention", json={"check_index": 2, "answer": "Germany"}), 409)
     status(client.post(f"{base}/survey", json=SURVEY), 409)
-    fresh, _ = new_session(client, False)
+    # starting over with the same uniqname is a new attempt; entering it again resumes that attempt
+    uniqname = s["participant_id"].split("-")[0]
+    fresh, _ = new_session(client, False, uniqname)
+    assert fresh["participant_id"] == f"{uniqname}-noai-2"
     assert fresh["attention_check"] is None and not fresh["terminated"] and fresh["done"] == 0
+    assert new_session(client, False, uniqname)[0]["participant_id"] == f"{uniqname}-noai-2"
+
+
+def test_uniqname(client):
+    for bad in ("", "ab", "abc1", "abcdefghi", "a b c", "jsmith@gmail.com"):
+        status(client.post("/api/sessions", json={"ai_assist": True, "uniqname": bad}), 422)
+    status(client.post("/api/sessions", json={"ai_assist": True}), 422)
+
+    # normalized, one session per uniqname and condition, resumed by entering it again
+    s, base = new_session(client, True, "  JSmith@UMich.edu ")
+    assert s["participant_id"] == "jsmith-ai" and s["ai_assist"]
+    with mock.patch.object(gemini, "suggest", return_value=CARDS):
+        status(client.get(f"{base}/ai/0"), 200)
+    answer_trial(client, base, s)
+    again, _ = new_session(client, True, "jsmith")
+    assert again["participant_id"] == "jsmith-ai" and again["done"] == 1
+    other, _ = new_session(client, False, "jsmith")
+    assert other["participant_id"] == "jsmith-noai" and not other["ai_assist"] and other["done"] == 0
 
 
 def test_random_trials(client):
@@ -203,6 +229,7 @@ if __name__ == "__main__":
         test_no_ai_flow(client)
         test_ai_flow(client)
         test_attention(client)
+        test_uniqname(client)
         test_random_trials(client)
     test_env_file()
     test_validation()

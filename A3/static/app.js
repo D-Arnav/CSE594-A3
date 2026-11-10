@@ -54,26 +54,40 @@ function invalidLink() {
 }
 
 function consent(aiAssist) {
+  const UNIQNAME_HELP = "Enter your uniqname: 3 to 8 letters, the part before @umich.edu.";
   const err = h("p", {className: "err", role: "alert"});
+  const input = h("input", {id: "uniqname", name: "uniqname", autocomplete: "username", autocapitalize: "none",
+                            spellcheck: false, required: true, placeholder: "e.g. jsmith"});
+  const start = h("button", {className: "primary", type: "submit", textContent: "I agree"});
   page(
     h("h1", {}, "Where was this photo taken?"),
     h("p", {className: "lead"}, "A short study for a university course. You'll look at street-level photos and guess the country."),
-    h("ul", {className: "facts"}, ["Under 10 minutes", "Anonymous", "Stop any time"].map(fact => h("li", {}, fact))),
-    h("p", {className: "muted"}, "Participation is voluntary. We record only your answers, response times and survey " +
-      "ratings. To stop, close this tab. By continuing, you confirm that you are 18 or older."),
-    err,
-    h("button", {className: "primary", textContent: "I agree", async onclick() {
-      this.disabled = true;
+    h("ul", {className: "facts"}, ["Under 10 minutes", "Stop any time"].map(fact => h("li", {}, fact))),
+    h("p", {className: "muted"}, "Participation is voluntary. We record your uniqname, answers, response times and " +
+      "survey ratings. Your uniqname is used only to match your two sessions. To stop, close this tab. By continuing, " +
+      "you confirm that you are 18 or older."),
+    h("form", {className: "field", async onsubmit(e) {
+      e.preventDefault();
+      const uniqname = input.value.trim().toLowerCase().replace(/@umich\.edu$/, "");
+      if (!/^[a-z]{3,8}$/.test(uniqname)) {
+        err.textContent = UNIQNAME_HELP;
+        return input.focus();
+      }
+      start.disabled = true;
       try {
-        session = await api("/api/sessions", {ai_assist: aiAssist});
-        // a refresh now resumes this participant instead of starting a new one
+        session = await api("/api/sessions", {ai_assist: aiAssist, uniqname});
+        // a refresh resumes this session; entering the same uniqname on this link does too
         history.replaceState(null, "", `${conditionParam(aiAssist)}&pid=${session.participant_id}`);
-        instructions();
+        session.done ? next() : instructions();
       } catch {
         err.textContent = "Could not start. Check your connection and try again.";
-        this.disabled = false;
+        start.disabled = false;
       }
-    }}));
+    }},
+      h("label", {htmlFor: "uniqname"}, "Your uniqname"),
+      h("div", {className: "uniq-row"}, input, h("span", {ariaHidden: "true"}, "@umich.edu")),
+      err, start));
+  input.focus({preventScroll: true});
 }
 
 function instructions() {
@@ -351,8 +365,8 @@ function thanks() {
        route(total - 1, total),
        h("p", {}, "Your answers are saved. You can close this tab now."),
        h("p", {}, "If a spreadsheet brought you here, add your name and comments to it."),
-       h("p", {className: "muted"}, "Completion code"),
-       h("p", {className: "code"}, session.participant_id.slice(0, 8)));
+       h("p", {className: "muted"}, "Recorded as"),
+       h("p", {className: "code"}, session.participant_id));
 }
 
 (async () => {

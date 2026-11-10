@@ -62,6 +62,16 @@ p { margin: 0 0 16px; }
 .muted { color: var(--slate); font-size: 14px; }
 .code { font: 700 22px var(--display); letter-spacing: 0.04em; background: var(--sky); color: var(--lagoon-deep); border-radius: 12px; padding: 12px 16px; display: inline-block; margin: 0; }
 
+/* Uniqname */
+.field { margin-top: 4px; }
+.field label { display: block; font-weight: 700; margin-bottom: 8px; }
+.uniq-row { display: flex; align-items: center; max-width: 22rem; margin-bottom: 14px; background: var(--white); border: 1px solid var(--line); border-radius: 12px; transition: border-color 130ms, box-shadow 130ms; }
+.uniq-row:focus-within { border-color: var(--lagoon); box-shadow: 0 0 0 3px var(--sky); }
+.uniq-row input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: inherit; font: 700 17px var(--body); padding: 11px 4px 11px 14px; }
+.uniq-row input::placeholder { color: #9aabbb; font-weight: 400; }
+.uniq-row span { padding-right: 14px; color: var(--slate); }
+.field .err { margin-bottom: 12px; }
+
 /* Survey */
 fieldset { border: 0; padding: 0; margin: 0 0 24px; }
 legend { padding: 0; margin-bottom: 10px; font-weight: 700; }
