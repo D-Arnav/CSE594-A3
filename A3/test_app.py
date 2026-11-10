@@ -161,10 +161,11 @@ def test_attention(client):
     status(client.post(f"{base}/responses", json={"trial_index": s["done"], "response": "Japan", "rt_ms": 10}), 409)
     status(client.post(f"{base}/attention", json={"check_index": 2, "answer": "Germany"}), 409)
     status(client.post(f"{base}/survey", json=SURVEY), 409)
-    # starting over with the same uniqname is a new attempt; entering it again resumes that attempt
+    # starting over with the same uniqname is a new attempt, with photos not seen in the first; entering it again resumes
     uniqname = s["participant_id"].split("-")[0]
     fresh, _ = new_session(client, False, uniqname)
     assert fresh["participant_id"] == f"{uniqname}-noai-2"
+    assert not set(fresh["images"]) & set(s["images"])
     assert fresh["attention_check"] is None and not fresh["terminated"] and fresh["done"] == 0
     assert new_session(client, False, uniqname)[0]["participant_id"] == f"{uniqname}-noai-2"
 
@@ -186,11 +187,41 @@ def test_uniqname(client):
     assert other["participant_id"] == "jsmith-noai" and not other["ai_assist"] and other["done"] == 0
 
 
+def test_photo_assignment(client):
+    # a person's two conditions never share a photo, in either order, including attention-check photos
+    for first in (True, False):
+        uniqname = next(UNIQNAMES)
+        a, a_base = new_session(client, first, uniqname)
+        b, _ = new_session(client, not first, uniqname)
+        photos = lambda s: set(s["images"]) | {study.image_url(i) for i in db.get_assignment(s["participant_id"])["check_images"]}  # noqa: E731
+        assert len(photos(a)) == len(photos(b)) == study.N_TRIALS + len(attention.CHECKS)
+        assert not photos(a) & photos(b)
+
+        # a partly done session resumes with the same photos and progress
+        for _ in range(3):
+            response = "Japan"
+            if first:
+                with mock.patch.object(gemini, "suggest", return_value=CARDS):
+                    response = status(client.get(f"{a_base}/ai/{a['done']}"), 200)[0]["country"]
+            a = answer_trial(client, a_base, a, response)
+        again, _ = new_session(client, first, uniqname)
+        assert again["participant_id"] == a["participant_id"] and again["done"] == 3 and again["images"] == a["images"]
+
+    # a finished session can't be redone: entering the uniqname again returns the same finished session
+    s, base = new_session(client, False)
+    while s["done"] < study.N_TRIALS:
+        s = answer_check(client, base, s) if s["attention_check"] else answer_trial(client, base, s)
+    status(client.post(f"{base}/survey", json=SURVEY), 200)
+    again, _ = new_session(client, False, s["participant_id"].split("-")[0])
+    assert again["participant_id"] == s["participant_id"] and again["done"] == study.N_TRIALS and again["survey_done"]
+    status(client.post(f"{base}/responses", json={"trial_index": study.N_TRIALS, "response": "Japan", "rt_ms": 10}), 409)
+
+
 def test_random_trials(client):
     draws = [new_session(client, True)[0] for _ in range(5)]
     for s in draws:
         ids = [Path(image).stem for image in s["images"]]
-        assert len(ids) == len(set(ids)) == study.N_TRIALS
+        assert len(ids) == len(set(ids)) == study.N_TRIALS and set(ids) <= set(study.TRUTH)  # 40 distinct of the 200
         assert Counter(study.TRUTH[i] for i in ids) == Counter({c: study.TRIALS_PER_COUNTRY for c in gemini.COUNTRIES})
         assert status(client.get(f"/api/sessions/{s['participant_id']}"), 200)["images"] == s["images"]  # stable on refresh
     assert len({tuple(s["images"]) for s in draws}) == len(draws)  # differs across participants
@@ -256,6 +287,7 @@ if __name__ == "__main__":
         test_ai_flow(client)
         test_attention(client)
         test_uniqname(client)
+        test_photo_assignment(client)
         test_random_trials(client)
     test_env_file()
     test_smolvlm_outputs()

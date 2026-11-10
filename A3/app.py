@@ -76,12 +76,40 @@ class Survey(BaseModel):
     free_text: str = Field("", max_length=5000)
 
 
-def image_order(participant_id):
-    """A random draw per participant, balanced across countries. Seeded by id, so a refresh keeps the same trials."""
+ASSIGNMENTS = {}  # participant_id -> photos; fixed once stored, so caching them in memory is safe
+
+
+def assignment(participant_id):
+    """The session's photos, drawn once when it starts and stored, so resuming continues the same list."""
+    if participant_id not in ASSIGNMENTS:
+        ASSIGNMENTS[participant_id] = db.get_assignment(participant_id) or db.save_assignment(
+            participant_id, *draw_photos(participant_id))
+    return ASSIGNMENTS[participant_id]
+
+
+def draw_photos(participant_id):
+    """-> (trial photos, attention-check photos): a random 8 per country, shuffled, plus one photo per check.
+    Photos from the same person's other sessions are excluded, so no photo appears in both conditions."""
+    uniqname, condition = participant_id.split("-")[:2]
+    others = db.other_assignments(uniqname, participant_id)
+    seen = {i for _, a in others for i in a["images"] + a["check_images"]}
+    other_condition = {i for pid, a in others if pid.split("-")[1] != condition for i in a["images"] + a["check_images"]}
     rng = random.Random(participant_id)
-    images = [image for c in gemini.COUNTRIES for image in rng.sample(BY_COUNTRY[c], TRIALS_PER_COUNTRY)]
+    images = []
+    for country in gemini.COUNTRIES:
+        pool = [i for i in BY_COUNTRY[country] if i not in seen]
+        if len(pool) < TRIALS_PER_COUNTRY:
+            # ponytail: after several restarts a photo may repeat from an earlier attempt of this condition, never
+            # from the other condition; past ~4 restarts in both conditions a country runs out and this raises
+            pool = [i for i in BY_COUNTRY[country] if i not in other_condition]
+        images += rng.sample(pool, TRIALS_PER_COUNTRY)
     rng.shuffle(images)
-    return images
+    rest = sorted(set(TRUTH) - set(images) - seen) or sorted(set(TRUTH) - set(images) - other_condition)
+    return images, rng.sample(rest, len(attention.CHECKS))
+
+
+def image_order(participant_id):
+    return assignment(participant_id)["images"]
 
 
 def gemini_trials(participant_id):
@@ -94,9 +122,8 @@ def image_url(image_id):
 
 
 def attention_image(participant_id, index):
-    """A random photo outside the participant's trials, so a check adds no exposure to a scored photo."""
-    others = sorted(set(TRUTH) - set(image_order(participant_id)))
-    return random.Random(f"{participant_id}-check-{index}").choice(others)
+    """A photo outside all of this person's trials, so a check adds no exposure to a scored photo."""
+    return assignment(participant_id)["check_images"][index]
 
 
 def participant(participant_id):

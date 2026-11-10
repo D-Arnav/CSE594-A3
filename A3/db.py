@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS surveys (
     participant_id TEXT PRIMARY KEY, confidence INTEGER NOT NULL, mental_demand INTEGER NOT NULL,
     geo_knowledge INTEGER NOT NULL, seen_other_condition INTEGER NOT NULL, trust INTEGER, usefulness INTEGER,
     free_text TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS assignments (
+    participant_id TEXT PRIMARY KEY, images TEXT NOT NULL, check_images TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS ai_shown (
     participant_id TEXT NOT NULL, trial_index INTEGER NOT NULL, image_id TEXT NOT NULL, source TEXT NOT NULL,
     suggestions TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (participant_id, trial_index));
@@ -95,6 +97,28 @@ def add_survey(participant_id, confidence, mental_demand, geo_knowledge, seen_ot
     _write("INSERT OR IGNORE INTO surveys VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
            (participant_id, confidence, mental_demand, geo_knowledge, int(seen_other_condition), trust, usefulness,
             free_text, now()))
+
+
+def get_assignment(participant_id):
+    """-> {"images", "check_images"} drawn for this session, or None before it is drawn."""
+    row = _one("SELECT images, check_images FROM assignments WHERE participant_id = ?", (participant_id,))
+    return row and {"images": json.loads(row[0]), "check_images": json.loads(row[1])}
+
+
+def save_assignment(participant_id, images, check_images):
+    """Store a session's photos and return what is stored. The first draw stands if two requests race."""
+    _write("INSERT OR IGNORE INTO assignments VALUES (?, ?, ?, ?)",
+           (participant_id, json.dumps(images), json.dumps(check_images), now()))
+    return get_assignment(participant_id)
+
+
+def other_assignments(uniqname, participant_id):
+    """-> [(participant_id, {"images", "check_images"})] for this uniqname's other sessions."""
+    with closing(connect()) as conn:
+        rows = conn.execute("SELECT participant_id, images, check_images FROM assignments "
+                            "WHERE participant_id LIKE ? AND participant_id != ?",
+                            (f"{uniqname}-%", participant_id)).fetchall()
+    return [(pid, {"images": json.loads(images), "check_images": json.loads(checks)}) for pid, images, checks in rows]
 
 
 def get_ai_shown(participant_id, trial_index):
